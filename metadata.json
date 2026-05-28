@@ -1,0 +1,6 @@
+{
+  "name": "Salafiya Group of Companies",
+  "description": "Established in 2021, SGC is a trusted conglomerate of SGC Gold, Salafiya Enterprises, and Salafi Realestate.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
