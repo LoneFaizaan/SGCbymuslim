@@ -678,7 +678,13 @@ export default function CompanyAdminDashboard({
 
                 {/* Division Breakdown Metrics Bar */}
                 <div className="p-4 rounded-2xl bg-[#0e111d] border border-white/5 text-left flex flex-col justify-between">
-                  <div className="text-[9px] uppercase font-bold tracking-wider text-gray-400 font-sans">Divisional Distribution</div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 font-sans">Divisional Distribution</span>
+                    <div className="flex items-center gap-1 bg-yellow-500/10 border border-yellow-500/20 rounded px-1.5 py-0.5" title="Connected to Google Firebase Realtime Database">
+                      <span className="w-1 h-1 rounded-full bg-yellow-500 animate-pulse shrink-0"></span>
+                      <span className="text-[8px] font-mono font-bold text-yellow-500 uppercase tracking-widest">RTDDB LIVE</span>
+                    </div>
+                  </div>
                   
                   <div className="space-y-1.5 mt-2">
                     <div className="flex justify-between items-center text-[10px] font-mono leading-none">

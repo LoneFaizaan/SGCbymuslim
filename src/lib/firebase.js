@@ -88,6 +88,17 @@ import {
   getDocFromServer
 } from 'firebase/firestore';
 
+import {
+  getDatabase,
+  ref,
+  set,
+  get,
+  child,
+  remove
+} from 'firebase/database';
+
+export const rtdb = getDatabase(app, firebaseConfig.databaseURL);
+
 export const OperationType = {
   CREATE: 'create',
   UPDATE: 'update',
@@ -114,7 +125,7 @@ function handleFirestoreError(error, operationType, path) {
     operationType,
     path
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  console.error('Firestore/RealtimeDB Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
 
@@ -129,50 +140,100 @@ export async function testConnection() {
   }
 }
 
-// Save inquiry to Firestore database
+// Save inquiry to Firestore and Realtime Database
 export async function saveInquiryToFirestore(inquiry) {
+  const payload = {
+    id: inquiry.id,
+    name: inquiry.name,
+    email: inquiry.email || '',
+    phone: inquiry.phone,
+    businessSection: inquiry.businessSection,
+    message: inquiry.message,
+    date: inquiry.date,
+    syncedToSheets: !!inquiry.syncedToSheets,
+    status: inquiry.status || 'new',
+    adminNotes: inquiry.adminNotes || ''
+  };
+
+  // 1. Save to Cloud Firestore
   const path = `inquiries/${inquiry.id}`;
   try {
-    // Avoid storing optional undefined fields
-    const payload = {
-      id: inquiry.id,
-      name: inquiry.name,
-      email: inquiry.email || '',
-      phone: inquiry.phone,
-      businessSection: inquiry.businessSection,
-      message: inquiry.message,
-      date: inquiry.date,
-      syncedToSheets: !!inquiry.syncedToSheets,
-      status: inquiry.status || 'new',
-      adminNotes: inquiry.adminNotes || ''
-    };
     await setDoc(doc(db, 'inquiries', inquiry.id), payload);
   } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, path);
+    console.error('Firestore save failed:', error);
+  }
+
+  // 2. Save to Realtime Database
+  try {
+    const rtdbRef = ref(rtdb, 'inquiries/' + inquiry.id);
+    await set(rtdbRef, payload);
+    console.log('Saved inquiry to Realtime Database successfully:', inquiry.id);
+  } catch (error) {
+    console.error('Realtime Database save failed:', error);
   }
 }
 
-// Load inquiries from Firestore database
+// Load inquiries from both Firestore & Realtime Database and merge them
 export async function loadInquiriesFromFirestore() {
   const path = 'inquiries';
+  const inquiriesMap = new Map();
+
+  // 1. Attempt loading from Realtime Database first (as requested for primary showcasing)
+  try {
+    const rtdbRef = ref(rtdb);
+    const snapshot = await get(child(rtdbRef, 'inquiries'));
+    if (snapshot.exists()) {
+      const rtdbData = snapshot.val();
+      if (rtdbData) {
+        Object.values(rtdbData).forEach((inq) => {
+          if (inq && inq.id) {
+            inquiriesMap.set(inq.id, inq);
+          }
+        });
+        console.log(`Loaded ${inquiriesMap.size} inquiries from RTDDB successfully.`);
+      }
+    }
+  } catch (error) {
+    console.error('Realtime Database fetch failed:', error);
+  }
+
+  // 2. Attempt loading from Cloud Firestore and merge (preventing loss of older data)
   try {
     const snapshot = await getDocs(collection(db, path));
-    const inquiries = [];
     snapshot.forEach((docSnapshot) => {
-      inquiries.push(docSnapshot.data());
+      const data = docSnapshot.data();
+      if (data && data.id) {
+        inquiriesMap.set(data.id, data);
+      }
     });
-    return inquiries;
+    console.log(`Merged with Firestore inquiries, total unique inquiries: ${inquiriesMap.size}`);
   } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
+    console.error('Firestore fetch failed:', error);
+    // If RTDDB was successful, we don't crash the whole UI
+    if (inquiriesMap.size === 0) {
+      handleFirestoreError(error, OperationType.LIST, path);
+    }
   }
+
+  return Array.from(inquiriesMap.values());
 }
 
-// Delete inquiry from Firestore database
+// Delete inquiry from both Firestore & Realtime Database
 export async function deleteInquiryFromFirestore(id) {
+  // 1. Delete from Firestore
   const path = `inquiries/${id}`;
   try {
     await deleteDoc(doc(db, 'inquiries', id));
   } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
+    console.error('Firestore delete failed:', error);
+  }
+
+  // 2. Delete from Realtime Database
+  try {
+    const rtdbRef = ref(rtdb, 'inquiries/' + id);
+    await remove(rtdbRef);
+    console.log('Deleted inquiry from Realtime Database successfully:', id);
+  } catch (error) {
+    console.error('Realtime Database delete failed:', error);
   }
 }
