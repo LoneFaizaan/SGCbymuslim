@@ -1,17 +1,15 @@
-import { Inquiry } from '../types';
-
 /**
  * Sends an email notification to the administrator via Gmail API using the logged-in user's OAuth access token.
  * Uses MIME layout format and base64url safe encoding.
  */
 export async function sendInquiryEmail(
-  accessToken: string,
-  adminEmail: string,
-  inquiry: Inquiry
-): Promise<void> {
+  accessToken,
+  adminEmail,
+  inquiry
+) {
   const subject = `[SGC New Appointment/Lead] from ${inquiry.name} (${inquiry.businessSection.toUpperCase()})`;
   
-  const getSectionLabel = (sect: Inquiry['businessSection']) => {
+  const getSectionLabel = (sect) => {
     switch (sect) {
       case 'gold': return 'SGC Gold Quote Inquiry';
       case 'catering': return 'Salafiya Catering Estimated Booking';

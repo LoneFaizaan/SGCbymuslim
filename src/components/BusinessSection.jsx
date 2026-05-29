@@ -4,14 +4,10 @@ import sgcGold from '../assets/images/sgc_gold_jewelry_1779942518913.png';
 import salafiyaCatering from '../assets/images/salafiya_catering_1779942543592.png';
 import salafiRealestate from '../assets/images/salafi_realestate_1779942569443.png';
 
-interface BusinessSectionProps {
-  onExploreBusiness: (id: 'gold' | 'catering' | 'real_estate') => void;
-}
-
-export default function BusinessSection({ onExploreBusiness }: BusinessSectionProps) {
+export default function BusinessSection({ onExploreBusiness }) {
   const businesses = [
     {
-      id: 'gold' as const,
+      id: 'gold',
       name: 'SGC Gold',
       image: sgcGold,
       icon: <Sparkles className="w-5 h-5 text-yellow-500" />,
@@ -30,7 +26,7 @@ export default function BusinessSection({ onExploreBusiness }: BusinessSectionPr
       bulletColor: 'border-yellow-500/40 bg-yellow-500'
     },
     {
-      id: 'catering' as const,
+      id: 'catering',
       name: 'Salafiya Enterprises',
       image: salafiyaCatering,
       icon: <Utensils className="w-5 h-5 text-emerald-500" />,
@@ -49,7 +45,7 @@ export default function BusinessSection({ onExploreBusiness }: BusinessSectionPr
       bulletColor: 'border-emerald-500/40 bg-emerald-550'
     },
     {
-      id: 'real_estate' as const,
+      id: 'real_estate',
       name: 'Salafi Realestate',
       image: salafiRealestate,
       icon: <Building2 className="w-5 h-5 text-sky-500" />,

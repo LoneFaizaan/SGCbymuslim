@@ -1,7 +1,7 @@
 import { Facebook, Instagram, MessageCircle, MapPin, Phone, Mail } from 'lucide-react';
 
 export default function Footer() {
-  const scrollToSection = (id: string) => {
+  const scrollToSection = (id) => {
     const element = document.getElementById(id);
     if (element) {
       const offset = 80;
@@ -58,7 +58,7 @@ export default function Footer() {
           </h4>
           <ul className="space-y-2 text-xs">
             {['HOME', 'ABOUT US', 'OUR BUSINESSES', 'WHY SGC', 'CONTACT US'].map((link) => {
-              const ids: Record<string, string> = {
+              const ids = {
                 'HOME': 'home',
                 'ABOUT US': 'about',
                 'OUR BUSINESSES': 'businesses',

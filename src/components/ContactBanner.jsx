@@ -1,24 +1,12 @@
-import { useState, useImperativeHandle, forwardRef, useRef, FormEvent } from 'react';
+import { useState, useImperativeHandle, forwardRef, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Phone, Send, Sparkles, Building, 
   Mail, MessageSquare, ArrowRight, Check,
   AlertCircle
 } from 'lucide-react';
-import { Inquiry } from '../types';
 
-interface ContactBannerProps {
-  onSubmitInquiry: (inquiry: Omit<Inquiry, 'id' | 'date'>) => void;
-  prefillMessage: string;
-  prefillBusiness: 'gold' | 'catering' | 'real_estate' | 'general';
-  onClearPrefills: () => void;
-}
-
-export interface ContactBannerRef {
-  focusForm: () => void;
-}
-
-export default forwardRef<ContactBannerRef, ContactBannerProps>(function ContactBanner(
+export default forwardRef(function ContactBanner(
   { onSubmitInquiry, prefillMessage, prefillBusiness, onClearPrefills },
   ref
 ) {
@@ -26,14 +14,14 @@ export default forwardRef<ContactBannerRef, ContactBannerProps>(function Contact
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [businessSection, setBusinessSection] = useState<'gold' | 'catering' | 'real_estate' | 'general'>('general');
+  const [businessSection, setBusinessSection] = useState('general');
   const [message, setMessage] = useState('');
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
   const [validationError, setValidationError] = useState('');
 
-  const formElementRef = useRef<HTMLDivElement>(null);
+  const formElementRef = useRef(null);
 
   // Expose focus/reveal action upwards
   useImperativeHandle(ref, () => ({
@@ -59,7 +47,7 @@ export default forwardRef<ContactBannerRef, ContactBannerProps>(function Contact
     }
   };
 
-  const handleFormSubmit = (e: FormEvent) => {
+  const handleFormSubmit = (e) => {
     e.preventDefault();
     setValidationError('');
 
@@ -267,10 +255,10 @@ export default forwardRef<ContactBannerRef, ContactBannerProps>(function Contact
                       <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block">Which business are you contacting? *</label>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                         {[
-                          { id: 'general' as const, label: 'General Corporate' },
-                          { id: 'gold' as const, label: 'SGC Gold Services' },
-                          { id: 'catering' as const, label: 'Salafiya Catering' },
-                          { id: 'real_estate' as const, label: 'Salafi Realestate' },
+                          { id: 'general', label: 'General Corporate' },
+                          { id: 'gold', label: 'SGC Gold Services' },
+                          { id: 'catering', label: 'Salafiya Catering' },
+                          { id: 'real_estate', label: 'Salafi Realestate' },
                         ].map((division) => (
                           <button
                             key={division.id}

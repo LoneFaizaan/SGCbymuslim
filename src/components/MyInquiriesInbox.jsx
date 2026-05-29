@@ -5,7 +5,6 @@ import {
   FileSpreadsheet, LogIn, LogOut, CheckCircle, RotateCw, ExternalLink, 
   Link, AlertCircle, Sparkles, CheckCheck
 } from 'lucide-react';
-import { Inquiry } from '../types';
 import { googleSignIn, logout, initAuth, loadInquiriesFromFirestore, saveInquiryToFirestore } from '../lib/firebase';
 import { 
   createLeadsSpreadsheet, 
@@ -14,25 +13,17 @@ import {
 } from '../lib/googleSheets';
 import { sendInquiryEmail } from '../lib/gmail';
 
-interface MyInquiriesInboxProps {
-  isOpen: boolean;
-  onClose: () => void;
-  inquiries: Inquiry[];
-  onDeleteInquiry: (id: string) => void;
-  onUpdateInquiries: (updated: Inquiry[]) => void;
-}
-
 export default function MyInquiriesInbox({ 
   isOpen, 
   onClose, 
   inquiries, 
   onDeleteInquiry,
   onUpdateInquiries
-}: MyInquiriesInboxProps) {
+}) {
   
   // Core Google Sheets state management
-  const [user, setUser] = useState<any | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
   const [needsAuth, setNeedsAuth] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   
@@ -44,7 +35,7 @@ export default function MyInquiriesInbox({
   const [manualIdInput, setManualIdInput] = useState('');
   const [isTestingAccess, setIsTestingAccess] = useState(false);
   const [showManualInput, setShowManualInput] = useState(false);
-  const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [feedbackMsg, setFeedbackMsg] = useState(null);
 
   // Wire up the authentication listener
   useEffect(() => {
@@ -76,7 +67,7 @@ export default function MyInquiriesInbox({
         if (!active || !firestoreInquiries) return;
         
         // Merge with local state to ensure complete synchronization
-        const mergedMap = new Map<string, Inquiry>();
+        const mergedMap = new Map();
         
         // Populate local state leads first
         inquiries.forEach(inq => mergedMap.set(inq.id, inq));
@@ -128,7 +119,7 @@ export default function MyInquiriesInbox({
         setNeedsAuth(false);
         setFeedbackMsg({ type: 'success', text: `Authorized successfully as ${result.user.email}!` });
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       setFeedbackMsg({ type: 'error', text: err.message || 'Google authentication interrupted.' });
     } finally {
@@ -144,7 +135,7 @@ export default function MyInquiriesInbox({
       setToken(null);
       setNeedsAuth(true);
       setFeedbackMsg({ type: 'success', text: 'Signed out of Google Workspace Services.' });
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
     }
   };
@@ -164,7 +155,7 @@ export default function MyInquiriesInbox({
         type: 'success', 
         text: 'Created "SGC Business Leads & Customer Inquiries" spreadsheet in your Google Sheets successfully!' 
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       setFeedbackMsg({ 
         type: 'error', 
@@ -205,7 +196,7 @@ export default function MyInquiriesInbox({
           text: 'Unable to verify spreadsheet ID. Verify sharing permissions or spreadsheet ID correctness.' 
         });
       }
-    } catch (err: any) {
+    } catch (err) {
       setFeedbackMsg({ type: 'error', text: 'Failed to access Google Sheets API.' });
     } finally {
       setIsTestingAccess(false);
@@ -278,7 +269,7 @@ export default function MyInquiriesInbox({
         type: 'success', 
         text: `Successfully synced ${unsyncedLeads.length} lead(s) to Google Sheets ${emailStatusText}` 
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       setFeedbackMsg({ 
         type: 'error', 
@@ -289,7 +280,7 @@ export default function MyInquiriesInbox({
     }
   };
 
-  const getBusinessLabel = (sect: Inquiry['businessSection']) => {
+  const getBusinessLabel = (sect) => {
     switch (sect) {
       case 'gold': return { text: 'SGC Gold Quote', style: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' };
       case 'catering': return { text: 'Salafiya Catering Plan', style: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' };

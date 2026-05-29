@@ -1,12 +1,23 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User } from 'firebase/auth';
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getAnalytics, isSupported } from 'firebase/analytics';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Initialize Firebase App
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
+export const db = getFirestore(app);
 export const auth = getAuth(app);
+
+// Initialize Analytics if supported in the current environment
+export let analytics = null;
+isSupported().then((supported) => {
+  if (supported) {
+    analytics = getAnalytics(app);
+  }
+}).catch((err) => {
+  console.warn('Analytics initialization skipped:', err);
+});
 
 export const provider = new GoogleAuthProvider();
 // Request the full Google Sheets scope to create and update lead spreadsheets
@@ -17,14 +28,11 @@ provider.addScope('https://www.googleapis.com/auth/gmail.send');
 // Flag to indicate if we are currently signing in
 let isSigningIn = false;
 // Cache the access token in memory (never persist in localStorage for security)
-let cachedAccessToken: string | null = null;
+let cachedAccessToken = null;
 
 // Initialize auth state listener. Call this on app load or header load.
-export const initAuth = (
-  onAuthSuccess?: (user: User, token: string) => void,
-  onAuthFailure?: () => void
-) => {
-  return onAuthStateChanged(auth, async (user: User | null) => {
+export const initAuth = (onAuthSuccess, onAuthFailure) => {
+  return onAuthStateChanged(auth, async (user) => {
     if (user) {
       if (cachedAccessToken) {
         if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
@@ -41,7 +49,7 @@ export const initAuth = (
 };
 
 // Google OAuth Sign In Trigger
-export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
+export const googleSignIn = async () => {
   try {
     isSigningIn = true;
     const result = await signInWithPopup(auth, provider);
@@ -52,7 +60,7 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
 
     cachedAccessToken = credential.accessToken;
     return { user: result.user, accessToken: cachedAccessToken };
-  } catch (error: any) {
+  } catch (error) {
     console.error('Firebase Google Sign-In error:', error);
     throw error;
   } finally {
@@ -61,7 +69,7 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
 };
 
 // Retrieve token in-memory
-export const getAccessToken = async (): Promise<string | null> => {
+export const getAccessToken = async () => {
   return cachedAccessToken;
 };
 
@@ -79,36 +87,18 @@ import {
   deleteDoc,
   getDocFromServer
 } from 'firebase/firestore';
-import { Inquiry } from '../types';
 
-export enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
+export const OperationType = {
+  CREATE: 'create',
+  UPDATE: 'update',
+  DELETE: 'delete',
+  LIST: 'list',
+  GET: 'get',
+  WRITE: 'write',
+};
 
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId?: string | null;
-    email?: string | null;
-    emailVerified?: boolean | null;
-    isAnonymous?: boolean | null;
-    tenantId?: string | null;
-    providerInfo?: {
-      providerId?: string | null;
-      email?: string | null;
-    }[];
-  };
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
-  const errInfo: FirestoreErrorInfo = {
+function handleFirestoreError(error, operationType, path) {
+  const errInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
       userId: auth.currentUser?.uid,
@@ -140,7 +130,7 @@ export async function testConnection() {
 }
 
 // Save inquiry to Firestore database
-export async function saveInquiryToFirestore(inquiry: Inquiry): Promise<void> {
+export async function saveInquiryToFirestore(inquiry) {
   const path = `inquiries/${inquiry.id}`;
   try {
     // Avoid storing optional undefined fields
@@ -163,13 +153,13 @@ export async function saveInquiryToFirestore(inquiry: Inquiry): Promise<void> {
 }
 
 // Load inquiries from Firestore database
-export async function loadInquiriesFromFirestore(): Promise<Inquiry[]> {
+export async function loadInquiriesFromFirestore() {
   const path = 'inquiries';
   try {
     const snapshot = await getDocs(collection(db, path));
-    const inquiries: Inquiry[] = [];
+    const inquiries = [];
     snapshot.forEach((docSnapshot) => {
-      inquiries.push(docSnapshot.data() as Inquiry);
+      inquiries.push(docSnapshot.data());
     });
     return inquiries;
   } catch (error) {
@@ -178,7 +168,7 @@ export async function loadInquiriesFromFirestore(): Promise<Inquiry[]> {
 }
 
 // Delete inquiry from Firestore database
-export async function deleteInquiryFromFirestore(id: string): Promise<void> {
+export async function deleteInquiryFromFirestore(id) {
   const path = `inquiries/${id}`;
   try {
     await deleteDoc(doc(db, 'inquiries', id));
@@ -186,4 +176,3 @@ export async function deleteInquiryFromFirestore(id: string): Promise<void> {
     handleFirestoreError(error, OperationType.DELETE, path);
   }
 }
-

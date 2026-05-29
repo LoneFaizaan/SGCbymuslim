@@ -1,15 +1,8 @@
-import { Inquiry } from '../types';
-
-export interface SpreadsheetInfo {
-  spreadsheetId: string;
-  spreadsheetUrl: string;
-}
-
 /**
  * Creates a brand new Google Sheet specifically for storing SGC Business Leads.
  * Initial columns: Inquiry ID, Date, Division, Customer Name, Email, Phone, Message
  */
-export async function createLeadsSpreadsheet(accessToken: string): Promise<SpreadsheetInfo> {
+export async function createLeadsSpreadsheet(accessToken) {
   const response = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
     method: 'POST',
     headers: {
@@ -41,7 +34,7 @@ export async function createLeadsSpreadsheet(accessToken: string): Promise<Sprea
 /**
  * Initializes the first row of columns in Sheet1 of the generated spreadsheet.
  */
-export async function setupSpreadsheetHeaders(accessToken: string, spreadsheetId: string): Promise<void> {
+export async function setupSpreadsheetHeaders(accessToken, spreadsheetId) {
   const headers = [
     [
       'Inquiry ID',
@@ -78,10 +71,10 @@ export async function setupSpreadsheetHeaders(accessToken: string, spreadsheetId
  * Appends a list of inquiries as rows into the designated Spreadsheet.
  */
 export async function appendInquiriesToSpreadsheet(
-  accessToken: string,
-  spreadsheetId: string,
-  inquiries: Inquiry[]
-): Promise<void> {
+  accessToken,
+  spreadsheetId,
+  inquiries
+) {
   // Translate Inquiry instances into table arrays
   const rows = inquiries.map((inq) => [
     inq.id,
@@ -116,7 +109,7 @@ export async function appendInquiriesToSpreadsheet(
 /**
  * Verifies if a given Spreadsheet is accessible using the provided accessToken
  */
-export async function verifySpreadsheetAccess(accessToken: string, spreadsheetId: string): Promise<boolean> {
+export async function verifySpreadsheetAccess(accessToken, spreadsheetId) {
   try {
     const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`, {
       method: 'GET',

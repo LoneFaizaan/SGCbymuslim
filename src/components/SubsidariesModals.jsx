@@ -6,20 +6,13 @@ import {
   Maximize2, BedDouble, Bath, ChevronRight, 
   SlidersHorizontal, Sparkles, Filter 
 } from 'lucide-react';
-import { GoldPurity, MenuItem, PropertyListing, PropertyType } from '../types';
 import { GOLD_RATES, CATERING_MENU_ITEMS, REAL_ESTATE_LISTINGS } from '../data';
 
-interface SubsidariesModalsProps {
-  activeSection: 'gold' | 'catering' | 'real_estate' | null;
-  onClose: () => void;
-  onInquire: (business: 'gold' | 'catering' | 'real_estate', details: string) => void;
-}
-
-export default function SubsidariesModals({ activeSection, onClose, onInquire }: SubsidariesModalsProps) {
+export default function SubsidariesModals({ activeSection, onClose, onInquire }) {
 
   // --- SGC GOLD CALCULATOR STATE ---
-  const [goldWeight, setGoldWeight] = useState<number>(10);
-  const [goldPurity, setGoldPurity] = useState<GoldPurity>('22K');
+  const [goldWeight, setGoldWeight] = useState(10);
+  const [goldPurity, setGoldPurity] = useState('22K');
   const serviceChargePercent = 1.5; // SGC Service margin
 
   const goldCalculation = useMemo(() => {
@@ -38,10 +31,10 @@ export default function SubsidariesModals({ activeSection, onClose, onInquire }:
 
 
   // --- RESTAURANT / CATERING STATE ---
-  const [guestCount, setGuestCount] = useState<number>(150);
-  const [selectedMenuItems, setSelectedMenuItems] = useState<string[]>(['app-1', 'main-2', 'des-1', 'bev-1']); // default selected recipe IDs
+  const [guestCount, setGuestCount] = useState(150);
+  const [selectedMenuItems, setSelectedMenuItems] = useState(['app-1', 'main-2', 'des-1', 'bev-1']); // default selected recipe IDs
 
-  const handleToggleMenuItem = (id: string) => {
+  const handleToggleMenuItem = (id) => {
     setSelectedMenuItems(prev => 
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
@@ -67,8 +60,8 @@ export default function SubsidariesModals({ activeSection, onClose, onInquire }:
 
 
   // --- REALESTATE FILTER STATE ---
-  const [selectedTypeFilter, setSelectedTypeFilter] = useState<'All' | PropertyType>('All');
-  const [maxPriceFilter, setMaxPriceFilter] = useState<number>(40000000); // 4 Cr Max
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState('All');
+  const [maxPriceFilter, setMaxPriceFilter] = useState(40000000); // 4 Cr Max
 
   const filteredProperties = useMemo(() => {
     return REAL_ESTATE_LISTINGS.filter(prop => {
@@ -94,7 +87,7 @@ export default function SubsidariesModals({ activeSection, onClose, onInquire }:
     );
   };
 
-  const handlePropertyBooking = (prop: PropertyListing) => {
+  const handlePropertyBooking = (prop) => {
     onInquire(
       'real_estate', 
       `Interested in commercial/residential property: "${prop.title}" (${prop.id}) located in ${prop.location} valued at ${prop.price}.`
@@ -236,7 +229,7 @@ export default function SubsidariesModals({ activeSection, onClose, onInquire }:
                     <div className="space-y-2">
                       <label className="text-xs text-gray-300 font-semibold uppercase tracking-wider block">Select Purity Caratage</label>
                       <div className="grid grid-cols-4 gap-2">
-                        {(Object.keys(GOLD_RATES) as GoldPurity[]).map((carat) => (
+                        {Object.keys(GOLD_RATES).map((carat) => (
                           <button
                             key={carat}
                             onClick={() => setGoldPurity(carat)}
@@ -473,7 +466,7 @@ export default function SubsidariesModals({ activeSection, onClose, onInquire }:
                       {['All', 'Commercial', 'Residential Sale', 'Residential Rental', 'Plot / Land'].map((type) => (
                         <button
                           key={type}
-                          onClick={() => setSelectedTypeFilter(type as any)}
+                          onClick={() => setSelectedTypeFilter(type)}
                           className={`px-3 py-1.5 rounded text-xs font-bold transition-all duration-200 cursor-pointer ${
                             selectedTypeFilter === type
                               ? 'bg-sky-500 text-[#0d101a]'

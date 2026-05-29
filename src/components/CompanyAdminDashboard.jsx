@@ -6,7 +6,6 @@ import {
   Link, AlertCircle, Sparkles, CheckCheck, Eye, EyeOff, Search, Filter, 
   Download, FileText, Check, Save, ArrowLeft, Building, HelpCircle, HardDrive
 } from 'lucide-react';
-import { Inquiry } from '../types';
 import { googleSignIn, logout, initAuth, saveInquiryToFirestore } from '../lib/firebase';
 import { 
   createLeadsSpreadsheet, 
@@ -15,21 +14,13 @@ import {
 } from '../lib/googleSheets';
 import { sendInquiryEmail } from '../lib/gmail';
 
-interface CompanyAdminDashboardProps {
-  isOpen: boolean;
-  onClose: () => void;
-  inquiries: Inquiry[];
-  onDeleteInquiry: (id: string) => void;
-  onUpdateInquiries: (updatedInquiries: Inquiry[]) => void;
-}
-
 export default function CompanyAdminDashboard({
   isOpen,
   onClose,
   inquiries,
   onDeleteInquiry,
   onUpdateInquiries
-}: CompanyAdminDashboardProps) {
+}) {
 
   // Login authentication state
   const [isAdminAuth, setIsAdminAuth] = useState(() => {
@@ -41,8 +32,8 @@ export default function CompanyAdminDashboard({
   const [loginError, setLoginError] = useState('');
 
   // Core Google Sheets state management
-  const [user, setUser] = useState<any | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
   const [needsAuth, setNeedsAuth] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
@@ -54,16 +45,16 @@ export default function CompanyAdminDashboard({
   const [manualIdInput, setManualIdInput] = useState('');
   const [isTestingAccess, setIsTestingAccess] = useState(false);
   const [showManualInput, setShowManualInput] = useState(false);
-  const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [feedbackMsg, setFeedbackMsg] = useState(null);
 
   // Filter & search states
   const [searchQuery, setSearchQuery] = useState('');
-  const [divisionFilter, setDivisionFilter] = useState<string>('all');
-  const [syncFilter, setSyncFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [divisionFilter, setDivisionFilter] = useState('all');
+  const [syncFilter, setSyncFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   // Selected Inquiry for Detail Inspector
-  const [selectedInquiry, setSelectedInquiry] = useState<Inquiry | null>(null);
+  const [selectedInquiry, setSelectedInquiry] = useState(null);
   const [adminNotesText, setAdminNotesText] = useState('');
 
   // Wire up the Google Workspace authentication listener
@@ -88,7 +79,7 @@ export default function CompanyAdminDashboard({
   if (!isOpen) return null;
 
   // Handle credentials authentication for Mubashir Lone
-  const handleAdminLogin = (e: React.FormEvent) => {
+  const handleAdminLogin = (e) => {
     e.preventDefault();
     setLoginError('');
 
@@ -122,7 +113,7 @@ export default function CompanyAdminDashboard({
         setNeedsAuth(false);
         setFeedbackMsg({ type: 'success', text: `Authorized successfully as ${result.user.email}!` });
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       setFeedbackMsg({ type: 'error', text: err.message || 'Google authentication interrupted.' });
     } finally {
@@ -138,7 +129,7 @@ export default function CompanyAdminDashboard({
       setToken(null);
       setNeedsAuth(true);
       setFeedbackMsg({ type: 'success', text: 'Signed out of Google Workspace Services.' });
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
     }
   };
@@ -158,7 +149,7 @@ export default function CompanyAdminDashboard({
         type: 'success', 
         text: 'Successfully constructed "SGC Business Leads & Customer Inquiries" in Google Sheets!' 
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       setFeedbackMsg({ 
         type: 'error', 
@@ -198,7 +189,7 @@ export default function CompanyAdminDashboard({
           text: 'Unable to access sheet. Verify sharing and permission settings or ID structure.' 
         });
       }
-    } catch (err: any) {
+    } catch (err) {
       setFeedbackMsg({ type: 'error', text: 'Failed to communicate with Google Sheets API.' });
     } finally {
       setIsTestingAccess(false);
@@ -264,7 +255,7 @@ export default function CompanyAdminDashboard({
         type: 'success', 
         text: `Successfully synced ${unsyncedLeads.length} lead(s) to Google Sheets ${emailText}` 
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       setFeedbackMsg({ 
         type: 'error', 
@@ -276,7 +267,7 @@ export default function CompanyAdminDashboard({
   };
 
   // Helper labels & styling mappings
-  const getBusinessLabel = (sect: Inquiry['businessSection']) => {
+  const getBusinessLabel = (sect) => {
     switch (sect) {
       case 'gold': return { text: 'SGC Gold Quote', style: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/25' };
       case 'catering': return { text: 'Salafiya Catering', style: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25' };
@@ -285,7 +276,7 @@ export default function CompanyAdminDashboard({
     }
   };
 
-  const getStatusLabelAndStyles = (status: Inquiry['status']) => {
+  const getStatusLabelAndStyles = (status) => {
     const activeStatus = status || 'new';
     switch (activeStatus) {
       case 'new': return { text: 'New Appointment', color: 'text-yellow-500 bg-yellow-500/10 border-yellow-500/25 animate-pulse' };
@@ -297,7 +288,7 @@ export default function CompanyAdminDashboard({
   };
 
   // Update status or notes for an inquiry both locally and in parent
-  const handleUpdateInquiryField = async (id: string, updatedFields: Partial<Inquiry>) => {
+  const handleUpdateInquiryField = async (id, updatedFields) => {
     const target = inquiries.find(i => i.id === id);
     if (!target) return;
 
@@ -326,7 +317,7 @@ export default function CompanyAdminDashboard({
   };
 
   // Single-customer detail modal inspector trigger
-  const openInquiryInspector = (inq: Inquiry) => {
+  const openInquiryInspector = (inq) => {
     setSelectedInquiry(inq);
     setAdminNotesText(inq.adminNotes || '');
   };
@@ -338,7 +329,7 @@ export default function CompanyAdminDashboard({
   };
 
   // Download individual customer detailed summary file
-  const downloadSingleCustomerReport = (inq: Inquiry) => {
+  const downloadSingleCustomerReport = (inq) => {
     const reportHeadline = `=== SALAFIYA GROUP OF COMPANIES - CUSTOMER DETAIL REPORT ===\n`;
     const reportData = [
       `Inquiry ID:          ${inq.id}`,
@@ -375,7 +366,7 @@ export default function CompanyAdminDashboard({
     }
 
     // Wrap elements with commas in quotes
-    const formatCSVField = (val: string) => {
+    const formatCSVField = (val) => {
       if (!val) return '""';
       const cleanVal = val.replace(/"/g, '""');
       return `"${cleanVal}"`;

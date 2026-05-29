@@ -1,28 +1,12 @@
-import { useState, useMemo, useRef, FormEvent } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Check, ArrowLeft, ChevronRight, Phone, Eye, Search,
   MapPin, Landmark, ShieldCheck, DollarSign, Calendar, MessageSquare, Send
 } from 'lucide-react';
 import salafiRealestate from '../assets/images/salafi_realestate_1779942569443.png';
-import { Inquiry } from '../types';
 
-interface RealEstateWebsiteProps {
-  onBackToParent: () => void;
-  onSubmitInquiry: (inquiry: Omit<Inquiry, 'id' | 'date'>) => void;
-}
-
-interface PropertyMock {
-  id: string;
-  title: string;
-  category: 'residential' | 'commercial' | 'plot';
-  price: string;
-  location: string;
-  size: string;
-  vibe: string;
-}
-
-const MOCK_PROPERTIES: PropertyMock[] = [
+const MOCK_PROPERTIES = [
   {
     id: 'prop-1',
     title: 'SGC Boulevard Commercial Plaza',
@@ -70,9 +54,9 @@ const MOCK_PROPERTIES: PropertyMock[] = [
   }
 ];
 
-export default function RealEstateWebsite({ onBackToParent, onSubmitInquiry }: RealEstateWebsiteProps) {
-  const [activeCategory, setActiveCategory] = useState<'all' | 'residential' | 'commercial' | 'plot'>('all');
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string>('prop-1');
+export default function RealEstateWebsite({ onBackToParent, onSubmitInquiry }) {
+  const [activeCategory, setActiveCategory] = useState('all');
+  const [selectedPropertyId, setSelectedPropertyId] = useState('prop-1');
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -80,8 +64,8 @@ export default function RealEstateWebsite({ onBackToParent, onSubmitInquiry }: R
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
-  const listingsRef = useRef<HTMLDivElement>(null);
-  const contactRef = useRef<HTMLDivElement>(null);
+  const listingsRef = useRef(null);
+  const contactRef = useRef(null);
 
   const filteredProperties = useMemo(() => {
     if (activeCategory === 'all') return MOCK_PROPERTIES;
@@ -100,12 +84,12 @@ export default function RealEstateWebsite({ onBackToParent, onSubmitInquiry }: R
     contactRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
-  const handleRequestSiteVisit = (title: string, loc: string) => {
+  const handleRequestSiteVisit = (title, loc) => {
     scrollToContact();
     setMsg(`I am interested in requesting a verified site-visit and complete title-deeds log file for property: "${title}" located at ${loc}. Please register my telephone slot.`);
   };
 
-  const handleFormSubmit = (e: FormEvent) => {
+  const handleFormSubmit = (e) => {
     e.preventDefault();
     if (!name.trim() || !phone.trim()) return;
 
@@ -293,7 +277,7 @@ export default function RealEstateWebsite({ onBackToParent, onSubmitInquiry }: R
 
             {/* Filter buttons */}
             <div className="flex flex-wrap gap-2">
-              {(['all', 'residential', 'commercial', 'plot'] as const).map((tab) => (
+              {['all', 'residential', 'commercial', 'plot'].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => {

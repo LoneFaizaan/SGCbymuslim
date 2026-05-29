@@ -6,30 +6,29 @@ import BusinessSection from './components/BusinessSection';
 import SubsidariesModals from './components/SubsidariesModals';
 import AboutUs from './components/AboutUs';
 import WhyChooseSGC from './components/WhyChooseSGC';
-import ContactBanner, { ContactBannerRef } from './components/ContactBanner';
+import ContactBanner from './components/ContactBanner';
 import Footer from './components/Footer';
 import MyInquiriesInbox from './components/MyInquiriesInbox';
 import CompanyAdminDashboard from './components/CompanyAdminDashboard';
 import GoldWebsite from './components/GoldWebsite';
 import CateringWebsite from './components/CateringWebsite';
 import RealEstateWebsite from './components/RealEstateWebsite';
-import { Inquiry } from './types';
 import { getAccessToken, saveInquiryToFirestore, deleteInquiryFromFirestore, loadInquiriesFromFirestore } from './lib/firebase';
 import { appendInquiriesToSpreadsheet } from './lib/googleSheets';
 import { sendInquiryEmail } from './lib/gmail';
 
 export default function App() {
-  const [activeWebsite, setActiveWebsite] = useState<'sgc' | 'gold' | 'catering' | 'real_estate'>('sgc');
-  const [activeModalSection, setActiveModalSection] = useState<'gold' | 'catering' | 'real_estate' | null>(null);
+  const [activeWebsite, setActiveWebsite] = useState('sgc');
+  const [activeModalSection, setActiveModalSection] = useState(null);
   const [isInboxOpen, setIsInboxOpen] = useState(false);
   const [isAdminDashboardOpen, setIsAdminDashboardOpen] = useState(false);
-  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+  const [inquiries, setInquiries] = useState([]);
 
   // Prefill buffers for contacting/inquiring directly from calculators or listings
   const [contactPrefillMsg, setContactPrefillMsg] = useState('');
-  const [contactPrefillBiz, setContactPrefillBiz] = useState<'gold' | 'catering' | 'real_estate' | 'general'>('general');
+  const [contactPrefillBiz, setContactPrefillBiz] = useState('general');
 
-  const contactBannerRef = useRef<ContactBannerRef>(null);
+  const contactBannerRef = useRef(null);
 
   // Load inquiries from localStorage on mount, then synchronize with Cloud Firestore
   useEffect(() => {
@@ -47,7 +46,7 @@ export default function App() {
         const cloudInquiries = await loadInquiriesFromFirestore();
         if (cloudInquiries && cloudInquiries.length > 0) {
           setInquiries(prev => {
-            const map = new Map<string, Inquiry>();
+            const map = new Map();
             prev.forEach(inq => map.set(inq.id, inq));
             cloudInquiries.forEach(inq => map.set(inq.id, inq));
             
@@ -75,7 +74,7 @@ export default function App() {
         const cloudInquiries = await loadInquiriesFromFirestore();
         if (cloudInquiries) {
           setInquiries(prev => {
-            const map = new Map<string, Inquiry>();
+            const map = new Map();
             prev.forEach(inq => map.set(inq.id, inq));
             cloudInquiries.forEach(inq => map.set(inq.id, inq));
 
@@ -95,7 +94,7 @@ export default function App() {
   }, [isAdminDashboardOpen]);
 
   // Save inquiries to localStorage when modified
-  const saveInquiriesToStorage = (updatedList: Inquiry[]) => {
+  const saveInquiriesToStorage = (updatedList) => {
     setInquiries(updatedList);
     try {
       localStorage.setItem('sgc_customer_inquiries', JSON.stringify(updatedList));
@@ -105,8 +104,8 @@ export default function App() {
   };
 
   // Callback to submit a new client inquiry
-  const handleAddInquiry = async (newInq: Omit<Inquiry, 'id' | 'date'>) => {
-    const formattedInq: Inquiry = {
+  const handleAddInquiry = async (newInq) => {
+    const formattedInq = {
       ...newInq,
       id: `inq-${Date.now()}`,
       date: new Date().toLocaleDateString('en-IN', {
@@ -158,7 +157,7 @@ export default function App() {
   };
 
   // Delete inquiries
-  const handleDeleteInquiry = async (id: string) => {
+  const handleDeleteInquiry = async (id) => {
     const filtered = inquiries.filter(i => i.id !== id);
     saveInquiriesToStorage(filtered);
 
@@ -171,10 +170,7 @@ export default function App() {
   };
 
   // Handles clicking "Submit Menu Quote" or "Book Payout Portfolio" in modal
-  const handleModalInquire = (
-    business: 'gold' | 'catering' | 'real_estate',
-    details: string
-  ) => {
+  const handleModalInquire = (business, details) => {
     setActiveModalSection(null); // Close the active dialog modal
     setContactPrefillBiz(business);
     setContactPrefillMsg(details);
@@ -186,7 +182,7 @@ export default function App() {
   };
 
   // Helper scroll triggers
-  const scrollToSection = (id: string) => {
+  const scrollToSection = (id) => {
     const element = document.getElementById(id);
     if (element) {
       const offset = 80;

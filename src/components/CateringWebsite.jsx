@@ -1,25 +1,12 @@
-import { useState, useMemo, useRef, FormEvent } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Check, ArrowLeft, ChevronRight, Phone, Clock, 
   UtensilsCrossed, Calendar, Sparkles, AlertCircle, ShoppingBag 
 } from 'lucide-react';
 import salafiyaCatering from '../assets/images/salafiya_catering_1779942543592.png';
-import { Inquiry } from '../types';
 
-interface CateringWebsiteProps {
-  onBackToParent: () => void;
-  onSubmitInquiry: (inquiry: Omit<Inquiry, 'id' | 'date'>) => void;
-}
-
-interface DishItem {
-  id: string;
-  name: string;
-  category: 'starter' | 'mains' | 'rice' | 'dessert';
-  basePrice: number;
-}
-
-const MENU_OPTIONS: DishItem[] = [
+const MENU_OPTIONS = [
   { id: 'rogan', name: 'Rogan Josh (Mutton Classic)', category: 'mains', basePrice: 180 },
   { id: 'rista', name: 'Rista (Minced Mutton Balls)', category: 'mains', basePrice: 190 },
   { id: 'kabab', name: 'Mutton Seekh Kebab (Skewered)', category: 'starter', basePrice: 85 },
@@ -32,10 +19,10 @@ const MENU_OPTIONS: DishItem[] = [
   { id: 'kahwa', name: 'Traditional Almond Saffron Kahwa', category: 'dessert', basePrice: 30 }
 ];
 
-export default function CateringWebsite({ onBackToParent, onSubmitInquiry }: CateringWebsiteProps) {
-  const [selectedDishes, setSelectedDishes] = useState<string[]>(['rogan', 'kabab', 'rice_premium', 'phirni']);
-  const [headcount, setHeadcount] = useState<number>(350);
-  const [eventType, setEventType] = useState<string>('Wedding');
+export default function CateringWebsite({ onBackToParent, onSubmitInquiry }) {
+  const [selectedDishes, setSelectedDishes] = useState(['rogan', 'kabab', 'rice_premium', 'phirni']);
+  const [headcount, setHeadcount] = useState(350);
+  const [eventType, setEventType] = useState('Wedding');
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -43,8 +30,8 @@ export default function CateringWebsite({ onBackToParent, onSubmitInquiry }: Cat
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
-  const menuRef = useRef<HTMLDivElement>(null);
-  const contactRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef(null);
+  const contactRef = useRef(null);
 
   const pricing = useMemo(() => {
     let perPlateSum = 0;
@@ -72,7 +59,7 @@ export default function CateringWebsite({ onBackToParent, onSubmitInquiry }: Cat
     };
   }, [selectedDishes, headcount]);
 
-  const toggleDish = (id: string) => {
+  const toggleDish = (id) => {
     setSelectedDishes(prev => 
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
@@ -86,7 +73,7 @@ export default function CateringWebsite({ onBackToParent, onSubmitInquiry }: Cat
     contactRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
-  const handleCateringSubmit = (e: FormEvent) => {
+  const handleCateringSubmit = (e) => {
     e.preventDefault();
     scrollToContact();
     const dishNames = selectedDishes
@@ -96,7 +83,7 @@ export default function CateringWebsite({ onBackToParent, onSubmitInquiry }: Cat
     setMsg(`I designed a custom layout for my ${eventType} event (headcount of ${headcount} plates). Included items are: [${dishNames}]. Calculated rate is ₹${pricing.perPlateFinal}/plate. Please contact me for professional booking.`);
   };
 
-  const handleFormSubmit = (e: FormEvent) => {
+  const handleFormSubmit = (e) => {
     e.preventDefault();
     if (!name.trim() || !phone.trim()) return;
 

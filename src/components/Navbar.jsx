@@ -2,13 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Phone, Menu, X, Building2, ShieldCheck } from 'lucide-react';
 
-interface NavbarProps {
-  onOpenInquiries: () => void;
-  inquiriesCount: number;
-  onOpenAdminDashboard: () => void;
-}
-
-export default function Navbar({ onOpenInquiries, inquiriesCount, onOpenAdminDashboard }: NavbarProps) {
+export default function Navbar({ onOpenInquiries, inquiriesCount, onOpenAdminDashboard }) {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
@@ -38,7 +32,7 @@ export default function Navbar({ onOpenInquiries, inquiriesCount, onOpenAdminDas
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const scrollToSection = (id: string) => {
+  const scrollToSection = (id) => {
     setIsOpen(false);
     const element = document.getElementById(id);
     if (element) {

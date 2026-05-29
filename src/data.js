@@ -1,5 +1,3 @@
-import { MenuItem, PropertyListing } from './types';
-
 // Approximate live gold rate per gram (INR) for estimation purposes
 export const GOLD_RATES = {
   '24K': 7550, // 99.9% pure
@@ -8,7 +6,7 @@ export const GOLD_RATES = {
   '14K': 4400, // 58.3% pure
 };
 
-export const CATERING_MENU_ITEMS: MenuItem[] = [
+export const CATERING_MENU_ITEMS = [
   // Appetizers
   {
     id: 'app-1',
@@ -123,7 +121,7 @@ export const CATERING_MENU_ITEMS: MenuItem[] = [
   },
 ];
 
-export const REAL_ESTATE_LISTINGS: PropertyListing[] = [
+export const REAL_ESTATE_LISTINGS = [
   {
     id: 'prop-1',
     title: 'SGC Commercial Complex Space',

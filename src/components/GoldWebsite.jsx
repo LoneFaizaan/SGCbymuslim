@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, FormEvent } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { motion } from 'motion/react';
 import { 
   Sparkles, ShieldCheck, Scale, Award, Info, 
@@ -7,17 +7,11 @@ import {
 } from 'lucide-react';
 import sgcGold from '../assets/images/sgc_gold_jewelry_1779942518913.png';
 import elderlyLadyGold from '../assets/images/elderly_lady_gold_1779958425132.png';
-import { GoldPurity, Inquiry } from '../types';
 import { GOLD_RATES } from '../data';
 
-interface GoldWebsiteProps {
-  onBackToParent: () => void;
-  onSubmitInquiry: (inquiry: Omit<Inquiry, 'id' | 'date'>) => void;
-}
-
-export default function GoldWebsite({ onBackToParent, onSubmitInquiry }: GoldWebsiteProps) {
-  const [goldWeight, setGoldWeight] = useState<number>(15);
-  const [goldPurity, setGoldPurity] = useState<GoldPurity>('22K');
+export default function GoldWebsite({ onBackToParent, onSubmitInquiry }) {
+  const [goldWeight, setGoldWeight] = useState(15);
+  const [goldPurity, setGoldPurity] = useState('22K');
   const serviceChargePercent = 1.5;
 
   const [name, setName] = useState('');
@@ -26,8 +20,8 @@ export default function GoldWebsite({ onBackToParent, onSubmitInquiry }: GoldWeb
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
-  const calculatorRef = useRef<HTMLDivElement>(null);
-  const contactRef = useRef<HTMLDivElement>(null);
+  const calculatorRef = useRef(null);
+  const contactRef = useRef(null);
 
   const goldCalculation = useMemo(() => {
     const rateGram = GOLD_RATES[goldPurity];
@@ -51,13 +45,13 @@ export default function GoldWebsite({ onBackToParent, onSubmitInquiry }: GoldWeb
     contactRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
-  const handleCalculateSubmit = (e: FormEvent) => {
+  const handleCalculateSubmit = (e) => {
     e.preventDefault();
     scrollToContact();
     setMsg(`I calculated my payout on SGC Gold Website: net weight of ${goldWeight}g in ${goldPurity} purity. Please provide a formal counter-rate estimate or book an assay slot.`);
   };
 
-  const handleFormSubmit = (e: FormEvent) => {
+  const handleFormSubmit = (e) => {
     e.preventDefault();
     if (!name.trim() || !phone.trim()) return;
 
@@ -399,7 +393,7 @@ export default function GoldWebsite({ onBackToParent, onSubmitInquiry }: GoldWeb
                 <div className="space-y-2">
                   <label className="text-xs text-gray-300 font-semibold uppercase block">Select Gold Purity</label>
                   <div className="grid grid-cols-4 gap-2.5">
-                    {(Object.keys(GOLD_RATES) as GoldPurity[]).map((carat) => (
+                    {Object.keys(GOLD_RATES).map((carat) => (
                       <button
                         type="button"
                         key={carat}

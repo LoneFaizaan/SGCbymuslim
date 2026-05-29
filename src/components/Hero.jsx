@@ -2,12 +2,7 @@ import { motion } from 'motion/react';
 import { ArrowRight, Building2, HelpCircle } from 'lucide-react';
 import sgcBuilding from '../assets/images/sgc_building_1779942492829.png';
 
-interface HeroProps {
-  onExploreBusinesses: () => void;
-  onAboutSgc: () => void;
-}
-
-export default function Hero({ onExploreBusinesses, onAboutSgc }: HeroProps) {
+export default function Hero({ onExploreBusinesses, onAboutSgc }) {
   return (
     <section
       id="home"
