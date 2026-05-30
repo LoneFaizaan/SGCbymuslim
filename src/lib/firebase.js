@@ -97,7 +97,60 @@ import {
   remove
 } from 'firebase/database';
 
-export const rtdb = getDatabase(app, firebaseConfig.databaseURL);
+const projectId = firebaseConfig.projectId || 'sgc1-d1cab';
+
+// Generate primary possible RTDDB URLs based on standard regional structures
+const rtdbUrls = [
+  firebaseConfig.databaseURL,
+  `https://${projectId}-default-rtdb.firebaseio.com`,
+  `https://${projectId}-default-rtdb.asia-southeast1.firebasedatabase.app`,
+  `https://${projectId}-default-rtdb.europe-west1.firebasedatabase.app`
+].filter(Boolean);
+
+// Unique values only
+export const rtdbUrlsUnique = Array.from(new Set(rtdbUrls));
+
+// Helper to get fallback RTDDB instance if databaseURL is provided
+export const rtdb = getDatabase(app, firebaseConfig.databaseURL || rtdbUrlsUnique[0]);
+
+// Diagnostic function to run real-time checks on the connections
+export async function testRtdbConnections() {
+  const results = [];
+  for (const url of rtdbUrlsUnique) {
+    try {
+      const rtdbInstance = getDatabase(app, url);
+      // Attempt checking connection info plus a quick mock inquiry write/read test
+      const testRef = ref(rtdbInstance, 'verification_probe');
+      await set(testRef, { lastChecked: Date.now(), client: 'sgc_portal' });
+      const snap = await get(testRef);
+      
+      results.push({
+        url,
+        region: url.includes('asia-southeast1') ? 'Asia (Singapore)' : url.includes('europe-west1') ? 'Europe (Belgium)' : 'US Central',
+        status: snap.exists() ? 'success' : 'limited',
+        details: 'Connected successfully. Read & Write permitted!'
+      });
+    } catch (err) {
+      const errMsg = err.message || String(err);
+      if (errMsg.toUpperCase().includes('PERMISSION_DENIED') || errMsg.toLowerCase().includes('permission denied')) {
+        results.push({
+          url,
+          region: url.includes('asia-southeast1') ? 'Asia (Singapore)' : url.includes('europe-west1') ? 'Europe (Belgium)' : 'US Central',
+          status: 'permission_denied',
+          details: 'Permission Denied! Check your RTDDB Security Rules in Firebase Console under Rules tab. Change rules to {".read": true, ".write": true} for testing.'
+        });
+      } else {
+        results.push({
+          url,
+          region: url.includes('asia-southeast1') ? 'Asia (Singapore)' : url.includes('europe-west1') ? 'Europe (Belgium)' : 'US Central',
+          status: 'failed',
+          details: errMsg.length > 80 ? errMsg.substring(0, 80) + '...' : errMsg
+        });
+      }
+    }
+  }
+  return results;
+}
 
 export const OperationType = {
   CREATE: 'create',
@@ -156,20 +209,23 @@ export async function saveInquiryToFirestore(inquiry) {
   };
 
   // 1. Save to Cloud Firestore
-  const path = `inquiries/${inquiry.id}`;
   try {
     await setDoc(doc(db, 'inquiries', inquiry.id), payload);
+    console.log('Saved inquiry to Cloud Firestore:', inquiry.id);
   } catch (error) {
     console.error('Firestore save failed:', error);
   }
 
-  // 2. Save to Realtime Database
-  try {
-    const rtdbRef = ref(rtdb, 'inquiries/' + inquiry.id);
-    await set(rtdbRef, payload);
-    console.log('Saved inquiry to Realtime Database successfully:', inquiry.id);
-  } catch (error) {
-    console.error('Realtime Database save failed:', error);
+  // 2. Save to all available Realtime Databases
+  for (const url of rtdbUrlsUnique) {
+    try {
+      const rtdbInstance = getDatabase(app, url);
+      const rtdbRef = ref(rtdbInstance, 'inquiries/' + inquiry.id);
+      await set(rtdbRef, payload);
+      console.log(`Saved inquiry to Realtime Database successfully at ${url}:`, inquiry.id);
+    } catch (error) {
+      console.warn(`Realtime Database save failed at ${url}:`, error);
+    }
   }
 }
 
@@ -178,23 +234,26 @@ export async function loadInquiriesFromFirestore() {
   const path = 'inquiries';
   const inquiriesMap = new Map();
 
-  // 1. Attempt loading from Realtime Database first (as requested for primary showcasing)
-  try {
-    const rtdbRef = ref(rtdb);
-    const snapshot = await get(child(rtdbRef, 'inquiries'));
-    if (snapshot.exists()) {
-      const rtdbData = snapshot.val();
-      if (rtdbData) {
-        Object.values(rtdbData).forEach((inq) => {
-          if (inq && inq.id) {
-            inquiriesMap.set(inq.id, inq);
-          }
-        });
-        console.log(`Loaded ${inquiriesMap.size} inquiries from RTDDB successfully.`);
+  // 1. Attempt loading from each possible Realtime Database URLs
+  for (const url of rtdbUrlsUnique) {
+    try {
+      const rtdbInstance = getDatabase(app, url);
+      const rtdbRef = ref(rtdbInstance);
+      const snapshot = await get(child(rtdbRef, 'inquiries'));
+      if (snapshot.exists()) {
+        const rtdbData = snapshot.val();
+        if (rtdbData) {
+          Object.values(rtdbData).forEach((inq) => {
+            if (inq && inq.id) {
+              inquiriesMap.set(inq.id, inq);
+            }
+          });
+          console.log(`Loaded ${inquiriesMap.size} inquiries from RTDDB at ${url}.`);
+        }
       }
+    } catch (error) {
+      console.warn(`Realtime Database fetch failed at ${url}:`, error);
     }
-  } catch (error) {
-    console.error('Realtime Database fetch failed:', error);
   }
 
   // 2. Attempt loading from Cloud Firestore and merge (preventing loss of older data)
@@ -221,19 +280,22 @@ export async function loadInquiriesFromFirestore() {
 // Delete inquiry from both Firestore & Realtime Database
 export async function deleteInquiryFromFirestore(id) {
   // 1. Delete from Firestore
-  const path = `inquiries/${id}`;
   try {
     await deleteDoc(doc(db, 'inquiries', id));
+    console.log('Deleted inquiry from Cloud Firestore:', id);
   } catch (error) {
     console.error('Firestore delete failed:', error);
   }
 
-  // 2. Delete from Realtime Database
-  try {
-    const rtdbRef = ref(rtdb, 'inquiries/' + id);
-    await remove(rtdbRef);
-    console.log('Deleted inquiry from Realtime Database successfully:', id);
-  } catch (error) {
-    console.error('Realtime Database delete failed:', error);
+  // 2. Delete from all available Realtime Databases
+  for (const url of rtdbUrlsUnique) {
+    try {
+      const rtdbInstance = getDatabase(app, url);
+      const rtdbRef = ref(rtdbInstance, 'inquiries/' + id);
+      await remove(rtdbRef);
+      console.log(`Deleted inquiry from Realtime Database at ${url}:`, id);
+    } catch (error) {
+      console.warn(`Realtime Database delete failed at ${url}:`, error);
+    }
   }
 }

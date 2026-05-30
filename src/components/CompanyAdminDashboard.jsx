@@ -6,7 +6,7 @@ import {
   Link, AlertCircle, Sparkles, CheckCheck, Eye, EyeOff, Search, Filter, 
   Download, FileText, Check, Save, ArrowLeft, Building, HelpCircle, HardDrive
 } from 'lucide-react';
-import { googleSignIn, logout, initAuth, saveInquiryToFirestore } from '../lib/firebase';
+import { googleSignIn, logout, initAuth, saveInquiryToFirestore, testRtdbConnections } from '../lib/firebase';
 import { 
   createLeadsSpreadsheet, 
   appendInquiriesToSpreadsheet, 
@@ -46,6 +46,29 @@ export default function CompanyAdminDashboard({
   const [isTestingAccess, setIsTestingAccess] = useState(false);
   const [showManualInput, setShowManualInput] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState(null);
+
+  // Realtime Database diagnostic state
+  const [rtdbTests, setRtdbTests] = useState([]);
+  const [isTestingRtdb, setIsTestingRtdb] = useState(false);
+
+  // Auto-run RTDDB diagnostics on load
+  const runRtdbDiagnostics = async () => {
+    setIsTestingRtdb(true);
+    try {
+      const res = await testRtdbConnections();
+      setRtdbTests(res);
+    } catch (e) {
+      console.error('Failed to run RTDDB diagnostics', e);
+    } finally {
+      setIsTestingRtdb(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && isAdminAuth) {
+      runRtdbDiagnostics();
+    }
+  }, [isOpen, isAdminAuth]);
 
   // Filter & search states
   const [searchQuery, setSearchQuery] = useState('');
@@ -903,6 +926,95 @@ export default function CompanyAdminDashboard({
 
                   </div>
                 )}
+              </div>
+
+              {/* REALTIME DATABASE CONNECTION DIAGNOSTIC MONITOR */}
+              <div className="bg-[#101424] border border-yellow-500/15 rounded-2xl p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
+                  <div className="text-left">
+                    <div className="flex items-center gap-2 text-xs font-bold text-gray-200 uppercase tracking-widest font-sans">
+                      <HardDrive className="w-5 h-5 text-yellow-500" />
+                      <span>Firebase Realtime Database Diagnostics Portal</span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1 font-sans">
+                      Monitored and resolved live sync channels under corporate project: <strong className="text-yellow-500 font-mono">sgc1-d1cab</strong>.
+                    </p>
+                  </div>
+                  <button
+                    onClick={runRtdbDiagnostics}
+                    disabled={isTestingRtdb}
+                    className="px-3.5 py-1.5 bg-yellow-500/10 hover:bg-yellow-500 hover:text-slate-950 font-bold text-yellow-500 text-[10px] uppercase font-sans border border-yellow-500/20 rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+                  >
+                    <RotateCw className={`w-3 h-3 ${isTestingRtdb ? 'animate-spin' : ''}`} />
+                    <span>Run Connection Diagnostics</span>
+                  </button>
+                </div>
+
+                {/* Regional Probes List */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
+                  {rtdbTests.map((t, idx) => (
+                    <div key={idx} className="p-4 bg-black/40 rounded-xl border border-white/5 flex flex-col justify-between space-y-3">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-white uppercase font-sans">{t.region}</span>
+                          {t.status === 'success' ? (
+                            <span className="text-[8px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 px-2 py-0.5 rounded font-mono font-bold uppercase tracking-wider">
+                              ACTIVE (OK)
+                            </span>
+                          ) : t.status === 'permission_denied' ? (
+                            <span className="text-[8px] bg-red-500/10 text-red-400 border border-red-500/25 px-2 py-0.5 rounded font-mono font-bold uppercase tracking-wider">
+                              LOCKED (RULES)
+                            </span>
+                          ) : (
+                            <span className="text-[8px] bg-gray-500/10 text-gray-400 border border-gray-500/25 px-2 py-0.5 rounded font-mono font-bold uppercase tracking-wider">
+                              UNREACHABLE
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[9px] font-mono text-gray-500 truncate mt-1">{t.url}</p>
+                        <p className="text-[11px] text-gray-300 font-sans mt-2.5 leading-normal">
+                          {t.details}
+                        </p>
+                      </div>
+
+                      {t.status === 'permission_denied' && (
+                        <div className="bg-red-500/5 p-2 rounded border border-red-500/10 space-y-1.5 text-[10px] leading-relaxed">
+                          <div className="flex items-center gap-1 text-red-400 font-bold">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                            <span>Action Required:</span>
+                          </div>
+                          <p className="text-gray-400">
+                            Your Realtime Database in {t.region} is active but has locked security rules. Go to your <a href="https://console.firebase.google.com/u/0/project/sgc1-d1cab/database/sgc1-d1cab-default-rtdb/rules" target="_blank" rel="noopener noreferrer" className="text-yellow-500 underline hover:text-yellow-400">Firebase Database Rules tab</a> and update them to:
+                          </p>
+                          <pre className="text-[9px] font-mono bg-black/40 p-2 rounded text-yellow-500 overflow-x-auto leading-tight">
+{`{
+  "rules": {
+    ".read": true,
+    ".write": true
+  }
+}`}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {rtdbTests.length === 0 && (
+                    <div className="col-span-3 text-center py-6 text-xs text-gray-500 font-sans">
+                      {isTestingRtdb ? 'Probing regional Realtime Database clusters...' : 'Click "Run Connection Diagnostics" above to test active region paths.'}
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-[#1e2540] text-[11px] border border-white/5 leading-relaxed text-gray-400 text-left flex gap-2.5 items-start">
+                  <HelpCircle className="w-4.5 h-4.5 text-yellow-500 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <span className="font-bold text-gray-300 block">Vercel Deployment Notes & Realtime Database Sync</span>
+                    <p>
+                      Since you deployed this site on Vercel, any client leads submitted by public visitors will instantly trigger our multi-database connector. This will mirror data securely across Firestore, and write to whichever regional Realtime Database you configured! If database rules allow writing, leads will instantly populate on your Firebase Database console and display beautifully on this admin dashboard.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* SEARCH, FILTER & DATA CONTROL TABLE */}
