@@ -2,17 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, Mail, Phone, Calendar, MessageSquare, Trash2, ClipboardCheck, 
-  FileSpreadsheet, LogIn, LogOut, CheckCircle, RotateCw, ExternalLink, 
-  Link, AlertCircle, Sparkles, CheckCheck, Eye, EyeOff, Search, Filter, 
-  Download, FileText, Check, Save, ArrowLeft, Building, HelpCircle, HardDrive
+  Eye, EyeOff, Search, Filter, 
+  Download, FileText, Check, Save, ArrowLeft, Building, HelpCircle, HardDrive,
+  CheckCheck, AlertCircle
 } from 'lucide-react';
-import { googleSignIn, logout, initAuth, saveInquiryToFirestore, testRtdbConnections } from '../lib/firebase';
-import { 
-  createLeadsSpreadsheet, 
-  appendInquiriesToSpreadsheet, 
-  verifySpreadsheetAccess 
-} from '../lib/googleSheets';
-import { sendInquiryEmail } from '../lib/gmail';
+import { saveInquiryToFirestore, testRtdbConnections } from '../lib/firebase';
 
 export default function CompanyAdminDashboard({
   isOpen,
@@ -30,22 +24,6 @@ export default function CompanyAdminDashboard({
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
-
-  // Core Google Sheets state management
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
-  const [needsAuth, setNeedsAuth] = useState(true);
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
-
-  const [spreadsheetId, setSpreadsheetId] = useState(() => localStorage.getItem('sgc_leads_spreadsheet_id') || '');
-  const [spreadsheetUrl, setSpreadsheetUrl] = useState(() => localStorage.getItem('sgc_leads_spreadsheet_url') || '');
-
-  const [isCreatingSheet, setIsCreatingSheet] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [manualIdInput, setManualIdInput] = useState('');
-  const [isTestingAccess, setIsTestingAccess] = useState(false);
-  const [showManualInput, setShowManualInput] = useState(false);
-  const [feedbackMsg, setFeedbackMsg] = useState(null);
 
   // Realtime Database diagnostic state
   const [rtdbTests, setRtdbTests] = useState([]);
@@ -73,31 +51,11 @@ export default function CompanyAdminDashboard({
   // Filter & search states
   const [searchQuery, setSearchQuery] = useState('');
   const [divisionFilter, setDivisionFilter] = useState('all');
-  const [syncFilter, setSyncFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
 
   // Selected Inquiry for Detail Inspector
   const [selectedInquiry, setSelectedInquiry] = useState(null);
   const [adminNotesText, setAdminNotesText] = useState('');
-
-  // Wire up the Google Workspace authentication listener
-  useEffect(() => {
-    if (!isOpen || !isAdminAuth) return;
-
-    const unsubscribe = initAuth(
-      (currentUser, accessToken) => {
-        setUser(currentUser);
-        setToken(accessToken);
-        setNeedsAuth(false);
-      },
-      () => {
-        setUser(null);
-        setToken(null);
-        setNeedsAuth(true);
-      }
-    );
-    return () => unsubscribe();
-  }, [isOpen, isAdminAuth]);
 
   if (!isOpen) return null;
 
@@ -122,171 +80,6 @@ export default function CompanyAdminDashboard({
   const handleAdminLogout = () => {
     setIsAdminAuth(false);
     sessionStorage.removeItem('sgc_admin_authorized');
-  };
-
-  // Google Workspace Authentication flows (GSheets, Gmail)
-  const handleGoogleSignIn = async () => {
-    setIsLoggingIn(true);
-    setFeedbackMsg(null);
-    try {
-      const result = await googleSignIn();
-      if (result) {
-        setUser(result.user);
-        setToken(result.accessToken);
-        setNeedsAuth(false);
-        setFeedbackMsg({ type: 'success', text: `Authorized successfully as ${result.user.email}!` });
-      }
-    } catch (err) {
-      console.error(err);
-      setFeedbackMsg({ type: 'error', text: err.message || 'Google authentication interrupted.' });
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
-
-  const handleLogOut = async () => {
-    setFeedbackMsg(null);
-    try {
-      await logout();
-      setUser(null);
-      setToken(null);
-      setNeedsAuth(true);
-      setFeedbackMsg({ type: 'success', text: 'Signed out of Google Workspace Services.' });
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  // Google Sheets integration logic
-  const handleCreateSheet = async () => {
-    if (!token) return;
-    setIsCreatingSheet(true);
-    setFeedbackMsg(null);
-    try {
-      const info = await createLeadsSpreadsheet(token);
-      setSpreadsheetId(info.spreadsheetId);
-      setSpreadsheetUrl(info.spreadsheetUrl);
-      localStorage.setItem('sgc_leads_spreadsheet_id', info.spreadsheetId);
-      localStorage.setItem('sgc_leads_spreadsheet_url', info.spreadsheetUrl);
-      setFeedbackMsg({ 
-        type: 'success', 
-        text: 'Successfully constructed "SGC Business Leads & Customer Inquiries" in Google Sheets!' 
-      });
-    } catch (err) {
-      console.error(err);
-      setFeedbackMsg({ 
-        type: 'error', 
-        text: err.message || 'Could not auto-create the spreadsheet.' 
-      });
-    } finally {
-      setIsCreatingSheet(false);
-    }
-  };
-
-  const handleLinkExisting = async () => {
-    if (!token || !manualIdInput.trim()) return;
-    setIsTestingAccess(true);
-    setFeedbackMsg(null);
-    try {
-      let extractedId = manualIdInput.trim();
-      if (extractedId.includes('/d/')) {
-        const parts = extractedId.split('/d/');
-        if (parts[1]) {
-          extractedId = parts[1].split('/')[0];
-        }
-      }
-
-      const hasAccess = await verifySpreadsheetAccess(token, extractedId);
-      if (hasAccess) {
-        const url = `https://docs.google.com/spreadsheets/d/${extractedId}/edit`;
-        setSpreadsheetId(extractedId);
-        setSpreadsheetUrl(url);
-        localStorage.setItem('sgc_leads_spreadsheet_id', extractedId);
-        localStorage.setItem('sgc_leads_spreadsheet_url', url);
-        setFeedbackMsg({ type: 'success', text: 'Google Spreadsheet verified and linked successfully!' });
-        setManualIdInput('');
-        setShowManualInput(false);
-      } else {
-        setFeedbackMsg({ 
-          type: 'error', 
-          text: 'Unable to access sheet. Verify sharing and permission settings or ID structure.' 
-        });
-      }
-    } catch (err) {
-      setFeedbackMsg({ type: 'error', text: 'Failed to communicate with Google Sheets API.' });
-    } finally {
-      setIsTestingAccess(false);
-    }
-  };
-
-  const handleUnlinkSheet = () => {
-    const isConfirmed = window.confirm(
-      'Unlink the current spreadsheet? This does not delete any files from your Google Drive but stops automatic inquiry syncing.'
-    );
-    if (isConfirmed) {
-      setSpreadsheetId('');
-      setSpreadsheetUrl('');
-      localStorage.removeItem('sgc_leads_spreadsheet_id');
-      localStorage.removeItem('sgc_leads_spreadsheet_url');
-      setFeedbackMsg({ type: 'success', text: 'Spreadsheet connection unlinked.' });
-    }
-  };
-
-  const handleSyncPendingLeads = async () => {
-    if (!token || !spreadsheetId) return;
-    
-    const unsyncedLeads = inquiries.filter(inq => !inq.syncedToSheets);
-    if (unsyncedLeads.length === 0) {
-      setFeedbackMsg({ type: 'success', text: 'All inquiries are already synced.' });
-      return;
-    }
-
-    setIsSyncing(true);
-    setFeedbackMsg(null);
-    try {
-      // Direct write to the designated spreadsheet
-      await appendInquiriesToSpreadsheet(token, spreadsheetId, unsyncedLeads);
-
-      // Email notifications
-      let emailSuccessCount = 0;
-      let emailFailCount = 0;
-      for (const lead of unsyncedLeads) {
-        try {
-          await sendInquiryEmail(token, 'muslimnazirlonekmr@gmail.com', lead);
-          emailSuccessCount++;
-        } catch (emailErr) {
-          console.error(`Failed to send email for lead ${lead.id}:`, emailErr);
-          emailFailCount++;
-        }
-      }
-
-      // Mark local state & prop callback
-      const updated = inquiries.map((inq) => {
-        if (!inq.syncedToSheets) {
-          return { ...inq, syncedToSheets: true };
-        }
-        return inq;
-      });
-
-      onUpdateInquiries(updated);
-      
-      const emailText = emailFailCount === 0 
-        ? 'and delivered email alerts to muslimnazirlonekmr@gmail.com successfully!'
-        : `with some Gmail alerts failing (sent: ${emailSuccessCount}, failed: ${emailFailCount}).`;
-
-      setFeedbackMsg({ 
-        type: 'success', 
-        text: `Successfully synced ${unsyncedLeads.length} lead(s) to Google Sheets ${emailText}` 
-      });
-    } catch (err) {
-      console.error(err);
-      setFeedbackMsg({ 
-        type: 'error', 
-        text: err.message || 'Failed to sync rows. Try re-signing into your Google account.' 
-      });
-    } finally {
-      setIsSyncing(false);
-    }
   };
 
   // Helper labels & styling mappings
@@ -361,7 +154,7 @@ export default function CompanyAdminDashboard({
       `Email Address:       ${inq.email || 'N/A'}`,
       `Phone Number:        ${inq.phone}`,
       `Business Division:   ${getBusinessLabel(inq.businessSection).text}`,
-      `Google Sync Status:  ${inq.syncedToSheets ? "Synced in Excel Spreadsheet" : "Pending Sheets Sync (Local DB only)"}`,
+      `Cloud Database:     Recorded in Firebase RTDB`,
       `Lead Triage Status:  ${(inq.status || 'new').toUpperCase()}`,
       `\n--- BUSINESS ADVISORY REQUIREMENTS & MESSAGE ---`,
       `${inq.message}`,
@@ -403,7 +196,7 @@ export default function CompanyAdminDashboard({
       'Phone Number',
       'Business Division',
       'Customer Message/Requirements',
-      'Google Sheets Synced?',
+      'Saved to Cloud DB?',
       'Admin Status',
       'Administrative Notes'
     ].join(',');
@@ -417,7 +210,7 @@ export default function CompanyAdminDashboard({
         formatCSVField(inq.phone),
         formatCSVField(getBusinessLabel(inq.businessSection).text),
         formatCSVField(inq.message),
-        formatCSVField(inq.syncedToSheets ? 'YES' : 'NO'),
+        formatCSVField('YES'),
         formatCSVField(inq.status || 'new'),
         formatCSVField(inq.adminNotes || '')
       ].join(',');
@@ -465,23 +258,16 @@ export default function CompanyAdminDashboard({
     // 2. Division filter Matcher
     const matchesDivision = divisionFilter === 'all' || inq.businessSection === divisionFilter;
 
-    // 3. Sync state filter Matcher
-    const matchesSync = syncFilter === 'all' || 
-      (syncFilter === 'synced' && inq.syncedToSheets) ||
-      (syncFilter === 'pending' && !inq.syncedToSheets);
-
-    // 4. Custom Status status Matcher
+    // 3. Custom Status status Matcher
     const matchesStatus = statusFilter === 'all' || 
       (statusFilter === 'new' && (!inq.status || inq.status === 'new')) ||
       inq.status === statusFilter;
 
-    return matchesSearch && matchesDivision && matchesSync && matchesStatus;
+    return matchesSearch && matchesDivision && matchesStatus;
   });
 
   // Calculate stats parameters
   const totalLeadsCount = inquiries.length;
-  const pendingSyncCount = inquiries.filter(inq => !inq.syncedToSheets).length;
-  const syncedCount = inquiries.filter(inq => inq.syncedToSheets).length;
   const goldCount = inquiries.filter(inq => inq.businessSection === 'gold').length;
   const cateringCount = inquiries.filter(inq => inq.businessSection === 'catering').length;
   const realEstateCount = inquiries.filter(inq => inq.businessSection === 'real_estate').length;
@@ -731,202 +517,7 @@ export default function CompanyAdminDashboard({
 
               </div>
 
-              {/* GOOGLE SHEETS LIVE CLOUD SYNC CONTROL UNIT */}
-              <div className="bg-[#101424] border border-yellow-500/15 rounded-2xl p-5 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="text-left">
-                    <div className="flex items-center gap-2 text-xs font-bold text-gray-200 uppercase tracking-widest font-sans">
-                      <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
-                      <span>Cloud Integration Portal (Google Sheets & Gmail alert Engine)</span>
-                    </div>
-                    <p className="text-[11px] text-gray-400 mt-1 font-sans">
-                      Provides authentication context for syncing client leads dynamically and executing appointment alert deliveries.
-                    </p>
-                  </div>
 
-                  {user ? (
-                    <div className="flex items-center gap-2 text-left shrink-0 bg-emerald-500/5 px-3 py-1.5 border border-emerald-500/20 rounded-xl">
-                      {user.photoURL && (
-                        <img src={user.photoURL} alt="Google avatar" className="w-5 h-5 rounded-full border border-yellow-500/30" referrerPolicy="no-referrer" />
-                      )}
-                      <div className="leading-tight">
-                        <span className="text-[10px] font-bold text-emerald-400 font-mono block truncate max-w-[150px]">{user.email}</span>
-                        <span className="text-[8px] text-gray-400 block uppercase font-bold tracking-wider">AUTHORIZED ADMIN</span>
-                      </div>
-                      <button 
-                        onClick={handleLogOut} 
-                        title="Disconnect system Google credentials"
-                        className="p-1 px-1.5 rounded bg-red-500/15 hover:bg-red-500 hover:text-white transition-all text-red-400 cursor-pointer text-[10px]"
-                      >
-                        Disconnect
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="text-[9px] bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider block shrink-0 w-max h-max">OFFLINE INTEGRATION MODE</span>
-                  )}
-                </div>
-
-                {/* Feedback message display */}
-                {feedbackMsg && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: -5 }} 
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`p-3.5 rounded-xl text-xs flex gap-2.5 items-start text-left ${
-                      feedbackMsg.type === 'success' 
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25' 
-                        : 'bg-red-500/10 text-red-400 border border-red-500/25'
-                    }`}
-                  >
-                    {feedbackMsg.type === 'success' ? <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" /> : <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />}
-                    <span className="leading-normal">{feedbackMsg.text}</span>
-                  </motion.div>
-                )}
-
-                {needsAuth ? (
-                  <div className="p-5 bg-black/30 border border-white/5 rounded-xl text-center space-y-3.5">
-                    <p className="text-xs text-gray-400 max-w-xl mx-auto leading-relaxed">
-                      Connect your google workspace profile. Once signed-in, inquiries submitted in the applet will save to the cloud database, construct an appointment report Excel file, and fire transaction summaries to <strong>muslimnazirlonekmr@gmail.com</strong>.
-                    </p>
-                    
-                    <div className="flex justify-center">
-                      <button
-                        type="button"
-                        onClick={handleGoogleSignIn}
-                        disabled={isLoggingIn}
-                        className="relative flex items-center justify-center gap-3 px-6 py-3 bg-white border border-gray-300 rounded-lg shadow-sm hover:shadow transition-all duration-300 text-gray-800 hover:bg-gray-50 active:bg-gray-100 cursor-pointer font-sans font-semibold text-xs uppercase tracking-wider"
-                      >
-                        <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="w-4 h-4 shrink-0">
-                          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
-                          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
-                          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
-                          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
-                        </svg>
-                        <span>{isLoggingIn ? 'Connecting...' : 'Authorize Google Account for Sheets & Gmail'}</span>
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    
-                    {/* Column 1: Connected Active spreadsheet */}
-                    <div className="p-4 bg-black/20 rounded-xl border border-white/5 flex flex-col justify-between text-left space-y-4">
-                      {spreadsheetId ? (
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
-                            <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">Linked GSheets Database</h4>
-                          </div>
-
-                          <div className="bg-black/50 p-2.5 rounded-lg border border-white/5 space-y-1">
-                            <span className="text-[10px] font-bold text-gray-200 block truncate">SGC Business Leads & Customer Inquiries</span>
-                            <span className="text-[9px] font-mono text-gray-500 block truncate">ID: {spreadsheetId}</span>
-                          </div>
-
-                          <div className="flex gap-2">
-                            <a 
-                              href={spreadsheetUrl} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="px-3 py-1.5 rounded-lg bg-yellow-500/10 hover:bg-yellow-500 hover:text-slate-950 text-yellow-500 font-bold transition-all text-[11px] flex items-center justify-center gap-1 shrink-0 border border-yellow-500/20"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                              <span>Open Sheet</span>
-                            </a>
-
-                            <button
-                              onClick={handleUnlinkSheet}
-                              className="px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-white font-bold transition-all text-[11px]"
-                            >
-                              Unlink
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">No Sheet Connected</h4>
-                          <p className="text-[11.5px] text-gray-400 max-w-sm font-light">
-                            Construct a spreadsheet inside Google Sheets or link an existing one to initialize live sync.
-                          </p>
-
-                          <div className="flex gap-2 pt-1">
-                            <button
-                              onClick={handleCreateSheet}
-                              disabled={isCreatingSheet}
-                              className="py-2 px-3 bg-yellow-500 hover:bg-yellow-400 text-slate-950 rounded-lg text-[10px] font-extrabold tracking-widest uppercase transition-all flex items-center gap-1 disabled:opacity-40"
-                            >
-                              {isCreatingSheet ? <RotateCw className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                              <span>Auto Create Sheet</span>
-                            </button>
-
-                            <button
-                              onClick={() => setShowManualInput(!showManualInput)}
-                              className="py-2 px-3 bg-white/5 hover:bg-white/10 text-white rounded-lg text-[10px] font-bold transition-all border border-white/10 flex items-center gap-1"
-                            >
-                              <Link className="w-3 h-3 text-gray-400" />
-                              <span>Link Custom ID</span>
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {showManualInput && !spreadsheetId && (
-                        <div className="pt-2.5 border-t border-white/5 space-y-1.5">
-                          <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">ID or full URL</label>
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={manualIdInput}
-                              onChange={(e) => setManualIdInput(e.target.value)}
-                              placeholder="https://docs.google.com/spreadsheets/d/your-id-here/edit"
-                              className="flex-1 bg-black/40 border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-yellow-500/50"
-                            />
-                            <button
-                              onClick={handleLinkExisting}
-                              disabled={isTestingAccess || !manualIdInput.trim()}
-                              className="px-3 py-1.5 bg-white/10 hover:bg-yellow-500 hover:text-slate-950 text-white rounded text-xs font-bold disabled:opacity-40 shrink-0 transition-all font-mono"
-                            >
-                              {isTestingAccess ? '...' : 'Link'}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                    </div>
-
-                    {/* Column 2: Manual Trigger Sync Queue */}
-                    <div className="p-4 bg-black/20 rounded-xl border border-white/5 flex flex-col justify-between text-left">
-                      <div className="space-y-2">
-                        <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">Sync Queue Controller</h4>
-                        <div className="flex justify-between items-center bg-black/40 p-2.5 rounded-lg border border-white/5">
-                          <div>
-                            <span className="text-[11px] text-gray-400 font-sans block">Client leads pending sync:</span>
-                            <span className="text-[14px] font-black tracking-widest text-orange-400 block mt-0.5">{pendingSyncCount} inquiry(s)</span>
-                          </div>
-                          
-                          <span className="text-[10px] bg-yellow-500/5 text-yellow-500 border border-yellow-500/10 rounded px-2 py-0.5 italic text-right">
-                            Requires manual sync
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="pt-3">
-                        <button
-                          onClick={handleSyncPendingLeads}
-                          disabled={isSyncing || pendingSyncCount === 0 || !spreadsheetId}
-                          className="w-full py-2.5 px-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold uppercase tracking-wider rounded-lg shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-                        >
-                          {isSyncing ? <RotateCw className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
-                          <span>Sync {pendingSyncCount} Pending Leads & Deliver Emails</span>
-                        </button>
-                        <span className="text-[8.5px] text-gray-500 text-center block mt-1.5 font-light">
-                          Sync process writes records to spreadsheet AND triggers formatted HTML email alerts to muslimnazirlonekmr@gmail.com
-                        </span>
-                      </div>
-                    </div>
-
-                  </div>
-                )}
-              </div>
 
               {/* REALTIME DATABASE CONNECTION DIAGNOSTIC MONITOR */}
               <div className="bg-[#101424] border border-yellow-500/15 rounded-2xl p-5 space-y-4">
@@ -1062,20 +653,6 @@ export default function CompanyAdminDashboard({
                       </select>
                     </div>
 
-                    {/* Filter sync */}
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <span className="text-gray-400 font-medium font-sans">Sync State:</span>
-                      <select
-                        value={syncFilter}
-                        onChange={(e) => setSyncFilter(e.target.value)}
-                        className="bg-black/50 border border-white/10 rounded-lg text-xs text-white px-3 py-1.5 focus:outline-none focus:border-yellow-500/50 cursor-pointer"
-                      >
-                        <option value="all">All Statuses</option>
-                        <option value="synced">Synced (Excel)</option>
-                        <option value="pending">Pending Sheets Sync</option>
-                      </select>
-                    </div>
-
                     {/* Filter triage/process status */}
                     <div className="flex items-center gap-1.5 text-xs">
                       <span className="text-gray-400 font-medium">Lead Status:</span>
@@ -1093,12 +670,11 @@ export default function CompanyAdminDashboard({
                     </div>
 
                     {/* Reset filtering states button */}
-                    {(divisionFilter !== 'all' || syncFilter !== 'all' || statusFilter !== 'all' || searchQuery) && (
+                    {(divisionFilter !== 'all' || statusFilter !== 'all' || searchQuery) && (
                       <button
                         onClick={() => {
                           setSearchQuery('');
                           setDivisionFilter('all');
-                          setSyncFilter('all');
                           setStatusFilter('all');
                         }}
                         className="p-1.5 text-xs bg-yellow-500/10 hover:bg-yellow-500 hover:text-[#060608] text-yellow-500 border border-yellow-500/15 rounded-lg transition-colors font-medium cursor-pointer"
@@ -1120,7 +696,6 @@ export default function CompanyAdminDashboard({
                           <th className="px-5 py-4">Submission Date</th>
                           <th className="px-5 py-4">Business Client</th>
                           <th className="px-5 py-4">Division Section</th>
-                          <th className="px-5 py-4">Google Sheet Sync</th>
                           <th className="px-5 py-4">Triage Status</th>
                           <th className="px-5 py-4 text-right">Administrative</th>
                         </tr>
@@ -1158,21 +733,6 @@ export default function CompanyAdminDashboard({
                                 <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 border rounded-full ${division.style}`}>
                                   {division.text}
                                 </span>
-                              </td>
-
-                              {/* Sheets sync status indicator */}
-                              <td className="px-5 py-4 whitespace-nowrap">
-                                {inq.syncedToSheets ? (
-                                  <span className="inline-flex items-center gap-1 text-[9px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-mono">
-                                    <CheckCheck className="w-3 h-3 shrink-0" />
-                                    <span>SYNCED (EXCEL)</span>
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 text-[9px] font-medium text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full font-mono">
-                                    <AlertCircle className="w-3 h-3 shrink-0" />
-                                    <span>PENDING SYNC</span>
-                                  </span>
-                                )}
                               </td>
 
                               {/* Administrative process state */}
@@ -1336,18 +896,11 @@ export default function CompanyAdminDashboard({
                     </div>
 
                     <div className="pt-2 border-t border-white/5">
-                      <span className="text-[10px] text-gray-500 block">Google Sheets Synced:</span>
-                      {selectedInquiry.syncedToSheets ? (
-                        <span className="text-[10.5px] font-bold text-emerald-400 flex items-center gap-1 mt-1 font-mono">
-                          <CheckCheck className="w-4 h-4 shrink-0" />
-                          <span>SYNCED TO SPREADSHEET</span>
-                        </span>
-                      ) : (
-                        <span className="text-[10.5px] font-semibold text-orange-400 flex items-center gap-1 mt-1 font-mono">
-                          <AlertCircle className="w-4 h-4 shrink-0" />
-                          <span>PENDING OUTBOX SYNC</span>
-                        </span>
-                      )}
+                      <span className="text-[10px] text-gray-500 block">Database Storage Status:</span>
+                      <span className="text-[10.5px] font-bold text-emerald-400 flex items-center gap-1 mt-1 font-mono">
+                        <CheckCheck className="w-4 h-4 shrink-0" />
+                        <span>CLOUD SECURE ACTIVE</span>
+                      </span>
                     </div>
                   </div>
 

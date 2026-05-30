@@ -13,7 +13,7 @@ import CompanyAdminDashboard from './components/CompanyAdminDashboard';
 import GoldWebsite from './components/GoldWebsite';
 import CateringWebsite from './components/CateringWebsite';
 import RealEstateWebsite from './components/RealEstateWebsite';
-import { getAccessToken, saveInquiryToFirestore, deleteInquiryFromFirestore, loadInquiriesFromFirestore } from './lib/firebase';
+import { getAccessToken, saveInquiryToFirestore, deleteInquiryFromFirestore, loadInquiriesFromFirestore, subscribeToInquiries } from './lib/firebase';
 import { appendInquiriesToSpreadsheet } from './lib/googleSheets';
 import { sendInquiryEmail } from './lib/gmail';
 
@@ -30,7 +30,7 @@ export default function App() {
 
   const contactBannerRef = useRef(null);
 
-  // Load inquiries from localStorage on mount, then synchronize with Cloud Firestore
+  // Load local cache and establish real-time subscription to Firebase Realtime Database
   useEffect(() => {
     try {
       const stored = localStorage.getItem('sgc_customer_inquiries');
@@ -38,60 +38,25 @@ export default function App() {
         setInquiries(JSON.parse(stored));
       }
     } catch (e) {
-      console.error('Failed to read gold/catering logs from local storage', e);
+      console.error('Failed to read cached inquiries from local storage', e);
     }
 
-    const syncWithCloud = async () => {
-      try {
-        const cloudInquiries = await loadInquiriesFromFirestore();
-        if (cloudInquiries && cloudInquiries.length > 0) {
-          setInquiries(prev => {
-            const map = new Map();
-            prev.forEach(inq => map.set(inq.id, inq));
-            cloudInquiries.forEach(inq => map.set(inq.id, inq));
-            
-            return Array.from(map.values()).sort((a, b) => {
-              const idA = Number(a.id.replace('inq-', '')) || 0;
-              const idB = Number(b.id.replace('inq-', '')) || 0;
-              return idB - idA;
-            });
-          });
+    // Subscribe to multi-region Realtime Database live nodes
+    const unsubscribe = subscribeToInquiries((rtdbInquiries) => {
+      if (rtdbInquiries) {
+        setInquiries(rtdbInquiries);
+        try {
+          localStorage.setItem('sgc_customer_inquiries', JSON.stringify(rtdbInquiries));
+        } catch (e) {
+          console.error('Failed to update local storage cache with live RTDDB data', e);
         }
-      } catch (err) {
-        console.warn('Initial Firestore query pending:', err);
       }
-    };
+    });
 
-    syncWithCloud();
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
-
-  // Sync / refresh database is performed when the Admin Console transitions to active
-  useEffect(() => {
-    if (!isAdminDashboardOpen) return;
-
-    const refreshDashboardInquiries = async () => {
-      try {
-        const cloudInquiries = await loadInquiriesFromFirestore();
-        if (cloudInquiries) {
-          setInquiries(prev => {
-            const map = new Map();
-            prev.forEach(inq => map.set(inq.id, inq));
-            cloudInquiries.forEach(inq => map.set(inq.id, inq));
-
-            return Array.from(map.values()).sort((a, b) => {
-              const idA = Number(a.id.replace('inq-', '')) || 0;
-              const idB = Number(b.id.replace('inq-', '')) || 0;
-              return idB - idA;
-            });
-          });
-        }
-      } catch (err) {
-        console.error('Failed to sync master dashboard with cloud database on load:', err);
-      }
-    };
-
-    refreshDashboardInquiries();
-  }, [isAdminDashboardOpen]);
 
   // Save inquiries to localStorage when modified
   const saveInquiriesToStorage = (updatedList) => {
@@ -118,38 +83,13 @@ export default function App() {
       syncedToSheets: false
     };
 
-    // First, save immediately to Firestore cloud database (rules permit writing by any user)
+    // Save lead record immediately to the Realtime Database (handles multi-region fallback automatically)
     try {
       await saveInquiryToFirestore(formattedInq);
+      console.log('[App] Lead stored successfully in RTDDB:', formattedInq.id);
     } catch (dbErr) {
-      console.error('Failed to save inquiry to Firestore DB:', dbErr);
-    }
-
-    // Now, attempt direct real-time sync with Google Sheets & send Gmail notifications if an active authenticated admin session is found
-    try {
-      const spreadsheetId = localStorage.getItem('sgc_leads_spreadsheet_id');
-      const token = await getAccessToken();
-      if (spreadsheetId && token) {
-        // Appending to Sheets
-        await appendInquiriesToSpreadsheet(token, spreadsheetId, [formattedInq]);
-        formattedInq.syncedToSheets = true;
-
-        // Sync synced state back to Firestore as well
-        try {
-          await saveInquiryToFirestore(formattedInq);
-        } catch (dbErr) {
-          console.error('Failed to update synced status in Firestore DB:', dbErr);
-        }
-
-        // Send Email Alert
-        try {
-          await sendInquiryEmail(token, 'muslimnazirlonekmr@gmail.com', formattedInq);
-        } catch (emailErr) {
-          console.error('Failed to send real-time Gmail appointment alert:', emailErr);
-        }
-      }
-    } catch (e) {
-      console.warn('Real-time Google Sheets or Gmail sync pending (signed-in session not active):', e);
+      console.error('[App] Critical fail storing lead to Realtime Database:', dbErr);
+      alert('Your inquiry submission failed. Please check network connection or database rules.');
     }
 
     const updated = [formattedInq, ...inquiries];

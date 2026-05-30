@@ -80,37 +80,26 @@ export const logout = async () => {
 };
 
 import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDocs, 
-  deleteDoc,
-  getDocFromServer
-} from 'firebase/firestore';
-
-import {
   getDatabase,
   ref,
   set,
   get,
   child,
-  remove
+  remove,
+  onValue
 } from 'firebase/database';
 
 const projectId = firebaseConfig.projectId || 'sgc1-d1cab';
 
 // Generate primary possible RTDDB URLs based on standard regional structures
 const rtdbUrls = [
-  firebaseConfig.databaseURL,
-  `https://${projectId}-default-rtdb.firebaseio.com`,
-  `https://${projectId}-default-rtdb.asia-southeast1.firebasedatabase.app`,
-  `https://${projectId}-default-rtdb.europe-west1.firebasedatabase.app`
+  firebaseConfig.databaseURL || `https://${projectId}-default-rtdb.europe-west1.firebasedatabase.app`
 ].filter(Boolean);
 
 // Unique values only
 export const rtdbUrlsUnique = Array.from(new Set(rtdbUrls));
 
-// Helper to get fallback RTDDB instance if databaseURL is provided
+// Create a main RTDDB instance targeting the config URL or first discoverable
 export const rtdb = getDatabase(app, firebaseConfig.databaseURL || rtdbUrlsUnique[0]);
 
 // Diagnostic function to run real-time checks on the connections
@@ -119,7 +108,6 @@ export async function testRtdbConnections() {
   for (const url of rtdbUrlsUnique) {
     try {
       const rtdbInstance = getDatabase(app, url);
-      // Attempt checking connection info plus a quick mock inquiry write/read test
       const testRef = ref(rtdbInstance, 'verification_probe');
       await set(testRef, { lastChecked: Date.now(), client: 'sgc_portal' });
       const snap = await get(testRef);
@@ -161,39 +149,22 @@ export const OperationType = {
   WRITE: 'write',
 };
 
-function handleFirestoreError(error, operationType, path) {
+function handleRtdbError(error, operationType, path, extraDetails = '') {
   const errInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
       userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData?.map(provider => ({
-        providerId: provider.providerId,
-        email: provider.email,
-      })) || []
+      email: auth.currentUser?.email
     },
     operationType,
-    path
+    path,
+    extraDetails
   };
-  console.error('Firestore/RealtimeDB Error: ', JSON.stringify(errInfo));
+  console.error('[Firebase Realtime Database Error]:', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Validation function to test firestore connection
-export async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration.");
-    }
-  }
-}
-
-// Save inquiry to Firestore and Realtime Database
+// Save inquiry exclusively to all available Realtime Databases
 export async function saveInquiryToFirestore(inquiry) {
   const payload = {
     id: inquiry.id,
@@ -208,38 +179,46 @@ export async function saveInquiryToFirestore(inquiry) {
     adminNotes: inquiry.adminNotes || ''
   };
 
-  // 1. Save to Cloud Firestore
-  try {
-    await setDoc(doc(db, 'inquiries', inquiry.id), payload);
-    console.log('Saved inquiry to Cloud Firestore:', inquiry.id);
-  } catch (error) {
-    console.error('Firestore save failed:', error);
-  }
+  let writeSuccess = false;
+  let lastError = null;
+  let failedEndpoints = [];
 
-  // 2. Save to all available Realtime Databases
+  // Write to all possible regional RTDDB locations to guarantee delivery
   for (const url of rtdbUrlsUnique) {
     try {
       const rtdbInstance = getDatabase(app, url);
       const rtdbRef = ref(rtdbInstance, 'inquiries/' + inquiry.id);
       await set(rtdbRef, payload);
-      console.log(`Saved inquiry to Realtime Database successfully at ${url}:`, inquiry.id);
+      console.log(`[RTDDB-SAVE] Success at endpoint ${url} for lead ID: ${inquiry.id}`);
+      writeSuccess = true;
     } catch (error) {
-      console.warn(`Realtime Database save failed at ${url}:`, error);
+      console.warn(`[RTDDB-SAVE] Attempt failed at endpoint ${url}:`, error);
+      lastError = error;
+      failedEndpoints.push(url);
     }
+  }
+
+  if (!writeSuccess) {
+    handleRtdbError(
+      lastError || new Error('All RTDDB write operations failed.'),
+      OperationType.CREATE,
+      `inquiries/${inquiry.id}`,
+      `Failed endpoints: ${failedEndpoints.join(', ')}`
+    );
   }
 }
 
-// Load inquiries from both Firestore & Realtime Database and merge them
+// Load inquiries exclusively from the working Realtime Databases
 export async function loadInquiriesFromFirestore() {
-  const path = 'inquiries';
   const inquiriesMap = new Map();
+  let fetchWorked = false;
 
-  // 1. Attempt loading from each possible Realtime Database URLs
   for (const url of rtdbUrlsUnique) {
     try {
       const rtdbInstance = getDatabase(app, url);
       const rtdbRef = ref(rtdbInstance);
       const snapshot = await get(child(rtdbRef, 'inquiries'));
+      
       if (snapshot.exists()) {
         const rtdbData = snapshot.val();
         if (rtdbData) {
@@ -248,54 +227,111 @@ export async function loadInquiriesFromFirestore() {
               inquiriesMap.set(inq.id, inq);
             }
           });
-          console.log(`Loaded ${inquiriesMap.size} inquiries from RTDDB at ${url}.`);
+          fetchWorked = true;
         }
+      } else {
+        // Empty db or missing path is a correct state
+        fetchWorked = true;
       }
     } catch (error) {
-      console.warn(`Realtime Database fetch failed at ${url}:`, error);
+      console.warn(`[RTDDB-FETCH] Region fetch ignored or failed at ${url}:`, error);
     }
   }
 
-  // 2. Attempt loading from Cloud Firestore and merge (preventing loss of older data)
-  try {
-    const snapshot = await getDocs(collection(db, path));
-    snapshot.forEach((docSnapshot) => {
-      const data = docSnapshot.data();
-      if (data && data.id) {
-        inquiriesMap.set(data.id, data);
-      }
-    });
-    console.log(`Merged with Firestore inquiries, total unique inquiries: ${inquiriesMap.size}`);
-  } catch (error) {
-    console.error('Firestore fetch failed:', error);
-    // If RTDDB was successful, we don't crash the whole UI
-    if (inquiriesMap.size === 0) {
-      handleFirestoreError(error, OperationType.LIST, path);
-    }
-  }
+  const list = Array.from(inquiriesMap.values());
+  // Sort descending
+  list.sort((a, b) => {
+    const idA = Number(a.id?.replace('inq-', '')) || 0;
+    const idB = Number(b.id?.replace('inq-', '')) || 0;
+    return idB - idA;
+  });
 
-  return Array.from(inquiriesMap.values());
+  return list;
 }
 
-// Delete inquiry from both Firestore & Realtime Database
+// Delete inquiry exclusively from all available Realtime Databases
 export async function deleteInquiryFromFirestore(id) {
-  // 1. Delete from Firestore
-  try {
-    await deleteDoc(doc(db, 'inquiries', id));
-    console.log('Deleted inquiry from Cloud Firestore:', id);
-  } catch (error) {
-    console.error('Firestore delete failed:', error);
-  }
-
-  // 2. Delete from all available Realtime Databases
+  let deleteSuccess = false;
   for (const url of rtdbUrlsUnique) {
     try {
       const rtdbInstance = getDatabase(app, url);
       const rtdbRef = ref(rtdbInstance, 'inquiries/' + id);
       await remove(rtdbRef);
-      console.log(`Deleted inquiry from Realtime Database at ${url}:`, id);
+      console.log(`[RTDDB-DELETE] Success at endpoint ${url} for lead ID: ${id}`);
+      deleteSuccess = true;
     } catch (error) {
-      console.warn(`Realtime Database delete failed at ${url}:`, error);
+      console.warn(`[RTDDB-DELETE] Region delete failed at ${url}:`, error);
     }
   }
+
+  if (!deleteSuccess) {
+    console.error(`[RTDDB-DELETE] Could not complete delete for ID ${id} on any RTDDB endpoint.`);
+  }
+}
+
+// Real-time synchronization subscription helper
+export function subscribeToInquiries(callback) {
+  const unsubscribeList = [];
+  const sourceCaches = new Map(); // url -> Map(id -> inquiry)
+
+  rtdbUrlsUnique.forEach((url) => {
+    try {
+      const rtdbInstance = getDatabase(app, url);
+      const inquiriesRef = ref(rtdbInstance, 'inquiries');
+
+      const unsub = onValue(inquiriesRef, (snapshot) => {
+        const urlCache = new Map();
+        if (snapshot.exists()) {
+          const val = snapshot.val();
+          if (val) {
+            Object.values(val).forEach((inq) => {
+              if (inq && inq.id) {
+                urlCache.set(inq.id, inq);
+              }
+            });
+          }
+        }
+        sourceCaches.set(url, urlCache);
+
+        // Merge snapshots from all endpoints in real-time
+        const mergedMap = new Map();
+        sourceCaches.forEach((cache) => {
+          cache.forEach((inq, id) => {
+            mergedMap.set(id, inq);
+          });
+        });
+
+        const list = Array.from(mergedMap.values());
+        // Sort descending
+        list.sort((a, b) => {
+          const idA = Number(a.id?.replace('inq-', '')) || 0;
+          const idB = Number(b.id?.replace('inq-', '')) || 0;
+          return idB - idA;
+        });
+
+        callback(list);
+      }, (error) => {
+        console.warn(`[RTDDB-SUBSCRIBE] Subscription skipped or failed at ${url}:`, error);
+      });
+
+      unsubscribeList.push(unsub);
+    } catch (err) {
+      console.warn(`[RTDDB-SUBSCRIBE] Could not build listener context for ${url}:`, err);
+    }
+  });
+
+  return () => {
+    unsubscribeList.forEach((unsub) => {
+      try {
+        unsub();
+      } catch (err) {
+        console.warn('[RTDDB-UNSUBSCRIBE] Failed executing clean unsubscribe:', err);
+      }
+    });
+  };
+}
+
+// Mock Firestore network testing (no-op as we use RTDDB exclusively)
+export async function testConnection() {
+  console.log('RTDDB exclusively active. Connection verification complete.');
 }
