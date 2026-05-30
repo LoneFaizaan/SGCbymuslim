@@ -48,10 +48,11 @@ export default function CompanyAdminDashboard({
     }
   }, [isOpen, isAdminAuth]);
 
-  // Filter & search states
+  // Filter, search & sorting states
   const [searchQuery, setSearchQuery] = useState('');
   const [divisionFilter, setDivisionFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('newest');
 
   // Selected Inquiry for Detail Inspector
   const [selectedInquiry, setSelectedInquiry] = useState(null);
@@ -266,8 +267,31 @@ export default function CompanyAdminDashboard({
     return matchesSearch && matchesDivision && matchesStatus;
   });
 
+  // Sort application pipeline
+  const sortedFilteredInquiries = [...filteredInquiries].sort((a, b) => {
+    if (sortBy === 'newest') {
+      const idA = Number(a.id?.replace('inq-', '')) || 0;
+      const idB = Number(b.id?.replace('inq-', '')) || 0;
+      return idB - idA;
+    }
+    if (sortBy === 'oldest') {
+      const idA = Number(a.id?.replace('inq-', '')) || 0;
+      const idB = Number(b.id?.replace('inq-', '')) || 0;
+      return idA - idB;
+    }
+    if (sortBy === 'name-asc') {
+      return (a.name || '').localeCompare(b.name || '');
+    }
+    if (sortBy === 'name-desc') {
+      return (b.name || '').localeCompare(a.name || '');
+    }
+    return 0;
+  });
+
   // Calculate stats parameters
   const totalLeadsCount = inquiries.length;
+  const pendingSyncCount = inquiries.filter(inq => !inq.syncedToSheets).length;
+  const syncedCount = inquiries.filter(inq => inq.syncedToSheets).length;
   const goldCount = inquiries.filter(inq => inq.businessSection === 'gold').length;
   const cateringCount = inquiries.filter(inq => inq.businessSection === 'catering').length;
   const realEstateCount = inquiries.filter(inq => inq.businessSection === 'real_estate').length;
@@ -669,13 +693,30 @@ export default function CompanyAdminDashboard({
                       </select>
                     </div>
 
+                    {/* Sort Order */}
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className="text-gray-400 font-medium">Sort By:</span>
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value)}
+                        className="bg-black/50 border border-white/10 rounded-lg text-xs text-white px-3 py-1.5 focus:outline-none focus:border-yellow-500/50 cursor-pointer animate-pulse"
+                        style={{ animationDuration: '3s' }}
+                      >
+                        <option value="newest">Submission Date (Newest to Oldest)</option>
+                        <option value="oldest">Submission Date (Oldest to Newest)</option>
+                        <option value="name-asc">Customer Name (A to Z)</option>
+                        <option value="name-desc">Customer Name (Z to A)</option>
+                      </select>
+                    </div>
+
                     {/* Reset filtering states button */}
-                    {(divisionFilter !== 'all' || statusFilter !== 'all' || searchQuery) && (
+                    {(divisionFilter !== 'all' || statusFilter !== 'all' || searchQuery || sortBy !== 'newest') && (
                       <button
                         onClick={() => {
                           setSearchQuery('');
                           setDivisionFilter('all');
                           setStatusFilter('all');
+                          setSortBy('newest');
                         }}
                         className="p-1.5 text-xs bg-yellow-500/10 hover:bg-yellow-500 hover:text-[#060608] text-yellow-500 border border-yellow-500/15 rounded-lg transition-colors font-medium cursor-pointer"
                       >
@@ -689,7 +730,7 @@ export default function CompanyAdminDashboard({
 
                 {/* Spreadsheet client representation data table */}
                 <div className="overflow-x-auto">
-                  {filteredInquiries.length > 0 ? (
+                  {sortedFilteredInquiries.length > 0 ? (
                     <table className="w-full text-left border-collapse table-auto">
                       <thead>
                         <tr className="bg-[#111525] border-b border-white/5 text-[10px] font-sans font-bold text-gray-400 uppercase tracking-widest">
@@ -701,7 +742,7 @@ export default function CompanyAdminDashboard({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/[0.03] text-xs">
-                        {filteredInquiries.map((inq) => {
+                        {sortedFilteredInquiries.map((inq) => {
                           const division = getBusinessLabel(inq.businessSection);
                           const statusInfo = getStatusLabelAndStyles(inq.status);
                           
@@ -795,7 +836,7 @@ export default function CompanyAdminDashboard({
 
                 {/* Table Footer info indicators */}
                 <div className="p-4 bg-[#111525] border-t border-white/5 text-[10px] text-gray-500 flex flex-col sm:flex-row justify-between items-center gap-2">
-                  <span>Showing {filteredInquiries.length} of {totalLeadsCount} records across all subsidiaries</span>
+                  <span>Showing {sortedFilteredInquiries.length} of {totalLeadsCount} records across all subsidiaries</span>
                   <span>Click on any table row to update customer appointment status and edit internal notes</span>
                 </div>
 

@@ -90,51 +90,44 @@ import {
 } from 'firebase/database';
 
 const projectId = firebaseConfig.projectId || 'sgc1-d1cab';
+const correctDatabaseUrl = 'https://sgc1-d1cab-default-rtdb.europe-west1.firebasedatabase.app';
 
-// Generate primary possible RTDDB URLs based on standard regional structures
-const rtdbUrls = [
-  firebaseConfig.databaseURL || `https://${projectId}-default-rtdb.europe-west1.firebasedatabase.app`
-].filter(Boolean);
+// Expose the unique database URL
+export const rtdbUrlsUnique = [correctDatabaseUrl];
 
-// Unique values only
-export const rtdbUrlsUnique = Array.from(new Set(rtdbUrls));
+// Create the single correct RTDDB instance explicitly
+export const rtdb = getDatabase(app, correctDatabaseUrl);
 
-// Create a main RTDDB instance targeting the config URL or first discoverable
-export const rtdb = getDatabase(app, firebaseConfig.databaseURL || rtdbUrlsUnique[0]);
-
-// Diagnostic function to run real-time checks on the connections
+// Diagnostic function to run real-time checks on the connection
 export async function testRtdbConnections() {
   const results = [];
-  for (const url of rtdbUrlsUnique) {
-    try {
-      const rtdbInstance = getDatabase(app, url);
-      const testRef = ref(rtdbInstance, 'verification_probe');
-      await set(testRef, { lastChecked: Date.now(), client: 'sgc_portal' });
-      const snap = await get(testRef);
-      
+  try {
+    const testRef = ref(rtdb, 'verification_probe');
+    await set(testRef, { lastChecked: Date.now(), client: 'sgc_portal' });
+    const snap = await get(testRef);
+    
+    results.push({
+      url: correctDatabaseUrl,
+      region: 'Europe (Belgium)',
+      status: snap.exists() ? 'success' : 'limited',
+      details: 'Connected successfully to Europe database. Read & Write permitted!'
+    });
+  } catch (err) {
+    const errMsg = err.message || String(err);
+    if (errMsg.toUpperCase().includes('PERMISSION_DENIED') || errMsg.toLowerCase().includes('permission denied')) {
       results.push({
-        url,
-        region: url.includes('asia-southeast1') ? 'Asia (Singapore)' : url.includes('europe-west1') ? 'Europe (Belgium)' : 'US Central',
-        status: snap.exists() ? 'success' : 'limited',
-        details: 'Connected successfully. Read & Write permitted!'
+        url: correctDatabaseUrl,
+        region: 'Europe (Belgium)',
+        status: 'permission_denied',
+        details: 'Permission Denied! Check your RTDDB Security Rules in Firebase Console under Rules tab. Change rules to {".read": true, ".write": true} for testing.'
       });
-    } catch (err) {
-      const errMsg = err.message || String(err);
-      if (errMsg.toUpperCase().includes('PERMISSION_DENIED') || errMsg.toLowerCase().includes('permission denied')) {
-        results.push({
-          url,
-          region: url.includes('asia-southeast1') ? 'Asia (Singapore)' : url.includes('europe-west1') ? 'Europe (Belgium)' : 'US Central',
-          status: 'permission_denied',
-          details: 'Permission Denied! Check your RTDDB Security Rules in Firebase Console under Rules tab. Change rules to {".read": true, ".write": true} for testing.'
-        });
-      } else {
-        results.push({
-          url,
-          region: url.includes('asia-southeast1') ? 'Asia (Singapore)' : url.includes('europe-west1') ? 'Europe (Belgium)' : 'US Central',
-          status: 'failed',
-          details: errMsg.length > 80 ? errMsg.substring(0, 80) + '...' : errMsg
-        });
-      }
+    } else {
+      results.push({
+        url: correctDatabaseUrl,
+        region: 'Europe (Belgium)',
+        status: 'failed',
+        details: errMsg.length > 80 ? errMsg.substring(0, 80) + '...' : errMsg
+      });
     }
   }
   return results;
@@ -164,8 +157,9 @@ function handleRtdbError(error, operationType, path, extraDetails = '') {
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Save inquiry exclusively to all available Realtime Databases
+// Save inquiry exclusively to the correct Realtime Database
 export async function saveInquiryToFirestore(inquiry) {
+  const fullPath = `inquiries/${inquiry.id}`;
   const payload = {
     id: inquiry.id,
     name: inquiry.name,
@@ -179,66 +173,67 @@ export async function saveInquiryToFirestore(inquiry) {
     adminNotes: inquiry.adminNotes || ''
   };
 
-  let writeSuccess = false;
-  let lastError = null;
-  let failedEndpoints = [];
+  // Detailed logging BEFORE database write
+  console.log('=== [RTDDB-DIAGNOSTIC] PRE-WRITE REPORT ===');
+  console.log(`- Runtime Project ID: ${firebaseConfig.projectId || 'Not set'}`);
+  console.log(`- Config Database URL: ${firebaseConfig.databaseURL || 'Not set'}`);
+  console.log('- Registered Unique RTDB URLs:', rtdbUrlsUnique);
+  console.log(`- Resolved Writing URL: ${correctDatabaseUrl}`);
+  console.log(`- Target DB Path: ${fullPath}`);
+  console.log('- Exact Payload to Write:', JSON.stringify(payload, null, 2));
+  console.log('============================================');
 
-  // Write to all possible regional RTDDB locations to guarantee delivery
-  for (const url of rtdbUrlsUnique) {
-    try {
-      const rtdbInstance = getDatabase(app, url);
-      const rtdbRef = ref(rtdbInstance, 'inquiries/' + inquiry.id);
-      await set(rtdbRef, payload);
-      console.log(`[RTDDB-SAVE] Success at endpoint ${url} for lead ID: ${inquiry.id}`);
-      writeSuccess = true;
-    } catch (error) {
-      console.warn(`[RTDDB-SAVE] Attempt failed at endpoint ${url}:`, error);
-      lastError = error;
-      failedEndpoints.push(url);
+  try {
+    const rtdbRef = ref(rtdb, fullPath);
+    await set(rtdbRef, payload);
+    console.log(`[RTDDB-SAVE] Success - Write operation completed at ${correctDatabaseUrl} for lead ID: ${inquiry.id}`);
+
+    // IMMEDIATE VERIFICATION: Perform a read-back check
+    console.log('=== [RTDDB-DIAGNOSTIC] IMMEDIATE VERIFICATION START ===');
+    console.log(`- Attempting immediate read-back from path: ${fullPath}`);
+    const verifySnap = await get(rtdbRef);
+    
+    if (verifySnap.exists()) {
+      const dbData = verifySnap.val();
+      console.log('✅ VERIFICATION SUCCESSFUL: Lead exists in database immediately post-write!');
+      console.log('- Snapshot returned after write:', JSON.stringify(dbData, null, 2));
+    } else {
+      console.error('❌ VERIFICATION FAILED: Write succeeded, but read-back returned no data at this path!');
     }
-  }
+    console.log('======================================================');
 
-  if (!writeSuccess) {
+  } catch (error) {
+    console.error(`[RTDDB-SAVE] Attempt failed at ${correctDatabaseUrl}:`, error);
     handleRtdbError(
-      lastError || new Error('All RTDDB write operations failed.'),
+      error,
       OperationType.CREATE,
-      `inquiries/${inquiry.id}`,
-      `Failed endpoints: ${failedEndpoints.join(', ')}`
+      fullPath,
+      `Database URL: ${correctDatabaseUrl}`
     );
   }
 }
 
-// Load inquiries exclusively from the working Realtime Databases
+// Load inquiries exclusively from the correct Realtime Database
 export async function loadInquiriesFromFirestore() {
-  const inquiriesMap = new Map();
-  let fetchWorked = false;
-
-  for (const url of rtdbUrlsUnique) {
-    try {
-      const rtdbInstance = getDatabase(app, url);
-      const rtdbRef = ref(rtdbInstance);
-      const snapshot = await get(child(rtdbRef, 'inquiries'));
-      
-      if (snapshot.exists()) {
-        const rtdbData = snapshot.val();
-        if (rtdbData) {
-          Object.values(rtdbData).forEach((inq) => {
-            if (inq && inq.id) {
-              inquiriesMap.set(inq.id, inq);
-            }
-          });
-          fetchWorked = true;
-        }
-      } else {
-        // Empty db or missing path is a correct state
-        fetchWorked = true;
+  const list = [];
+  try {
+    const rtdbRef = ref(rtdb);
+    const snapshot = await get(child(rtdbRef, 'inquiries'));
+    
+    if (snapshot.exists()) {
+      const rtdbData = snapshot.val();
+      if (rtdbData) {
+        Object.values(rtdbData).forEach((inq) => {
+          if (inq && inq.id) {
+            list.push(inq);
+          }
+        });
       }
-    } catch (error) {
-      console.warn(`[RTDDB-FETCH] Region fetch ignored or failed at ${url}:`, error);
     }
+  } catch (error) {
+    console.warn(`[RTDDB-FETCH] Region fetch failed or ignored at ${correctDatabaseUrl}:`, error);
   }
 
-  const list = Array.from(inquiriesMap.values());
   // Sort descending
   list.sort((a, b) => {
     const idA = Number(a.id?.replace('inq-', '')) || 0;
@@ -249,86 +244,52 @@ export async function loadInquiriesFromFirestore() {
   return list;
 }
 
-// Delete inquiry exclusively from all available Realtime Databases
+// Delete inquiry exclusively from the correct Realtime Database
 export async function deleteInquiryFromFirestore(id) {
-  let deleteSuccess = false;
-  for (const url of rtdbUrlsUnique) {
-    try {
-      const rtdbInstance = getDatabase(app, url);
-      const rtdbRef = ref(rtdbInstance, 'inquiries/' + id);
-      await remove(rtdbRef);
-      console.log(`[RTDDB-DELETE] Success at endpoint ${url} for lead ID: ${id}`);
-      deleteSuccess = true;
-    } catch (error) {
-      console.warn(`[RTDDB-DELETE] Region delete failed at ${url}:`, error);
-    }
-  }
-
-  if (!deleteSuccess) {
-    console.error(`[RTDDB-DELETE] Could not complete delete for ID ${id} on any RTDDB endpoint.`);
+  try {
+    const rtdbRef = ref(rtdb, 'inquiries/' + id);
+    await remove(rtdbRef);
+    console.log(`[RTDDB-DELETE] Success at ${correctDatabaseUrl} for lead ID: ${id}`);
+  } catch (error) {
+    console.warn(`[RTDDB-DELETE] Region delete failed at ${correctDatabaseUrl}:`, error);
   }
 }
 
 // Real-time synchronization subscription helper
 export function subscribeToInquiries(callback) {
-  const unsubscribeList = [];
-  const sourceCaches = new Map(); // url -> Map(id -> inquiry)
+  try {
+    const inquiriesRef = ref(rtdb, 'inquiries');
 
-  rtdbUrlsUnique.forEach((url) => {
-    try {
-      const rtdbInstance = getDatabase(app, url);
-      const inquiriesRef = ref(rtdbInstance, 'inquiries');
-
-      const unsub = onValue(inquiriesRef, (snapshot) => {
-        const urlCache = new Map();
-        if (snapshot.exists()) {
-          const val = snapshot.val();
-          if (val) {
-            Object.values(val).forEach((inq) => {
-              if (inq && inq.id) {
-                urlCache.set(inq.id, inq);
-              }
-            });
-          }
-        }
-        sourceCaches.set(url, urlCache);
-
-        // Merge snapshots from all endpoints in real-time
-        const mergedMap = new Map();
-        sourceCaches.forEach((cache) => {
-          cache.forEach((inq, id) => {
-            mergedMap.set(id, inq);
+    const unsub = onValue(inquiriesRef, (snapshot) => {
+      const list = [];
+      if (snapshot.exists()) {
+        const val = snapshot.val();
+        if (val) {
+          Object.values(val).forEach((inq) => {
+            if (inq && inq.id) {
+              list.push(inq);
+            }
           });
-        });
+        }
+      }
 
-        const list = Array.from(mergedMap.values());
-        // Sort descending
-        list.sort((a, b) => {
-          const idA = Number(a.id?.replace('inq-', '')) || 0;
-          const idB = Number(b.id?.replace('inq-', '')) || 0;
-          return idB - idA;
-        });
-
-        callback(list);
-      }, (error) => {
-        console.warn(`[RTDDB-SUBSCRIBE] Subscription skipped or failed at ${url}:`, error);
+      // Sort descending
+      list.sort((a, b) => {
+        const idA = Number(a.id?.replace('inq-', '')) || 0;
+        const idB = Number(b.id?.replace('inq-', '')) || 0;
+        return idB - idA;
       });
 
-      unsubscribeList.push(unsub);
-    } catch (err) {
-      console.warn(`[RTDDB-SUBSCRIBE] Could not build listener context for ${url}:`, err);
-    }
-  });
-
-  return () => {
-    unsubscribeList.forEach((unsub) => {
-      try {
-        unsub();
-      } catch (err) {
-        console.warn('[RTDDB-UNSUBSCRIBE] Failed executing clean unsubscribe:', err);
-      }
+      callback(list);
+    }, (error) => {
+      console.warn(`[RTDDB-SUBSCRIBE] Subscription failed at ${correctDatabaseUrl}:`, error);
     });
-  };
+
+    return unsub;
+  } catch (err) {
+    console.warn(`[RTDDB-SUBSCRIBE] Could not build listener context for ${correctDatabaseUrl}:`, err);
+    return () => {};
+  }
 }
 
 // Mock Firestore network testing (no-op as we use RTDDB exclusively)
