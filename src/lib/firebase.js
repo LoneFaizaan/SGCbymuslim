@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, deleteDoc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -157,7 +157,7 @@ function handleRtdbError(error, operationType, path, extraDetails = '') {
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Save inquiry exclusively to the correct Realtime Database
+// Save inquiry to BOTH Cloud Firestore and Realtime Database for total safety
 export async function saveInquiryToFirestore(inquiry) {
   const fullPath = `inquiries/${inquiry.id}`;
   const payload = {
@@ -174,7 +174,7 @@ export async function saveInquiryToFirestore(inquiry) {
   };
 
   // Detailed logging BEFORE database write
-  console.log('=== [RTDDB-DIAGNOSTIC] PRE-WRITE REPORT ===');
+  console.log('=== [DB-DIAGNOSTIC] PRE-WRITE REPORT ===');
   console.log(`- Runtime Project ID: ${firebaseConfig.projectId || 'Not set'}`);
   console.log(`- Config Database URL: ${firebaseConfig.databaseURL || 'Not set'}`);
   console.log('- Registered Unique RTDB URLs:', rtdbUrlsUnique);
@@ -183,39 +183,91 @@ export async function saveInquiryToFirestore(inquiry) {
   console.log('- Exact Payload to Write:', JSON.stringify(payload, null, 2));
   console.log('============================================');
 
+  let rtdbSuccess = false;
+  let rtdbErrorMsg = '';
+  let firestoreSuccess = false;
+  let firestoreErrorMsg = '';
+
+  // 1. Write to Realtime Database
   try {
     const rtdbRef = ref(rtdb, fullPath);
     await set(rtdbRef, payload);
-    console.log(`[RTDDB-SAVE] Success - Write operation completed at ${correctDatabaseUrl} for lead ID: ${inquiry.id}`);
-
-    // IMMEDIATE VERIFICATION: Perform a read-back check
-    console.log('=== [RTDDB-DIAGNOSTIC] IMMEDIATE VERIFICATION START ===');
-    console.log(`- Attempting immediate read-back from path: ${fullPath}`);
-    const verifySnap = await get(rtdbRef);
-    
-    if (verifySnap.exists()) {
-      const dbData = verifySnap.val();
-      console.log('✅ VERIFICATION SUCCESSFUL: Lead exists in database immediately post-write!');
-      console.log('- Snapshot returned after write:', JSON.stringify(dbData, null, 2));
-    } else {
-      console.error('❌ VERIFICATION FAILED: Write succeeded, but read-back returned no data at this path!');
-    }
-    console.log('======================================================');
-
+    rtdbSuccess = true;
+    console.log(`[RTDDB-SAVE] Success - Write completed at ${correctDatabaseUrl}`);
   } catch (error) {
-    console.error(`[RTDDB-SAVE] Attempt failed at ${correctDatabaseUrl}:`, error);
+    rtdbErrorMsg = error.message || String(error);
+    console.error(`[RTDDB-SAVE] Fallback caught - write failed:`, error);
+  }
+
+  // 2. Write to Cloud Firestore (Mirror so it appears under both tabs in Firebase Console)
+  try {
+    const firestoreRef = doc(db, 'inquiries', inquiry.id);
+    await setDoc(firestoreRef, payload);
+    firestoreSuccess = true;
+    console.log(`[FIRESTORE-SAVE] Success - Mirror write completed for doc ID: ${inquiry.id}`);
+  } catch (error) {
+    firestoreErrorMsg = error.message || String(error);
+    console.error(`[FIRESTORE-SAVE] Mirror write failed:`, error);
+  }
+
+  // IMMEDIATE VERIFICATION: Perform a read-back check for both
+  console.log('=== [DB-DIAGNOSTIC] IMMEDIATE VERIFICATION START ===');
+  
+  if (rtdbSuccess) {
+    try {
+      const rtdbRef = ref(rtdb, fullPath);
+      const verifySnap = await get(rtdbRef);
+      if (verifySnap.exists()) {
+        const dbData = verifySnap.val();
+        console.log('✅ RTDDB VERIFICATION SUCCESSFUL: Lead exists in Realtime Database post-write!');
+        console.log('- RTDDB Snapshot returned:', JSON.stringify(dbData, null, 2));
+      } else {
+        console.error('❌ RTDDB VERIFICATION FAILED: Write reported Success, but read-back returned null!');
+      }
+    } catch (e) {
+      console.error('❌ RTDDB VERIFICATION ERROR during read-back:', e);
+    }
+  } else {
+    console.error(`❌ RTDDB Write attempt failed: ${rtdbErrorMsg}`);
+  }
+
+  if (firestoreSuccess) {
+    try {
+      const firestoreRef = doc(db, 'inquiries', inquiry.id);
+      const verifySnap = await getDoc(firestoreRef);
+      if (verifySnap.exists()) {
+        const dbData = verifySnap.data();
+        console.log('✅ FIRESTORE VERIFICATION SUCCESSFUL: Lead exists in Cloud Firestore post-write!');
+        console.log('- Firestore Snapshot returned:', JSON.stringify(dbData, null, 2));
+      } else {
+        console.error('❌ FIRESTORE VERIFICATION FAILED: Write reported Success, but read-back returned null!');
+      }
+    } catch (e) {
+      console.error('❌ FIRESTORE VERIFICATION ERROR during read-back:', e);
+    }
+  } else {
+    console.error(`❌ Firestore Write attempt failed: ${firestoreErrorMsg}`);
+  }
+  
+  console.log('======================================================');
+
+  // Throw if both databases fail, otherwise proceed since mirroring did one or both
+  if (!rtdbSuccess && !firestoreSuccess) {
     handleRtdbError(
-      error,
+      new Error(`Total database failure. RTDDB: ${rtdbErrorMsg}. Firestore: ${firestoreErrorMsg}`),
       OperationType.CREATE,
       fullPath,
-      `Database URL: ${correctDatabaseUrl}`
+      'RTDDB & Firestore writes failed simultaneously.'
     );
   }
 }
 
-// Load inquiries exclusively from the correct Realtime Database
+// Load inquiries with fallback from both Realtime Database and Cloud Firestore
 export async function loadInquiriesFromFirestore() {
   const list = [];
+  const trackedIds = new Set();
+
+  // 1. Fetch from Realtime Database
   try {
     const rtdbRef = ref(rtdb);
     const snapshot = await get(child(rtdbRef, 'inquiries'));
@@ -226,12 +278,28 @@ export async function loadInquiriesFromFirestore() {
         Object.values(rtdbData).forEach((inq) => {
           if (inq && inq.id) {
             list.push(inq);
+            trackedIds.add(inq.id);
           }
         });
       }
     }
   } catch (error) {
-    console.warn(`[RTDDB-FETCH] Region fetch failed or ignored at ${correctDatabaseUrl}:`, error);
+    console.warn(`[RTDDB-FETCH] RTDDB fetch skipped/failed:`, error);
+  }
+
+  // 2. Fetch from Cloud Firestore to augment/fallback
+  try {
+    const colRef = collection(db, 'inquiries');
+    const querySnapshot = await getDocs(colRef);
+    querySnapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (data && data.id && !trackedIds.has(data.id)) {
+        list.push(data);
+        trackedIds.add(data.id);
+      }
+    });
+  } catch (error) {
+    console.warn(`[FIRESTORE-FETCH] Firestore fetch skipped/failed:`, error);
   }
 
   // Sort descending
@@ -244,14 +312,24 @@ export async function loadInquiriesFromFirestore() {
   return list;
 }
 
-// Delete inquiry exclusively from the correct Realtime Database
+// Delete inquiry from BOTH Cloud Firestore and Realtime Database
 export async function deleteInquiryFromFirestore(id) {
+  // 1. RTDDB removal
   try {
     const rtdbRef = ref(rtdb, 'inquiries/' + id);
     await remove(rtdbRef);
-    console.log(`[RTDDB-DELETE] Success at ${correctDatabaseUrl} for lead ID: ${id}`);
+    console.log(`[RTDDB-DELETE] Success at ${correctDatabaseUrl} for ID: ${id}`);
   } catch (error) {
-    console.warn(`[RTDDB-DELETE] Region delete failed at ${correctDatabaseUrl}:`, error);
+    console.warn(`[RTDDB-DELETE] RTDDB removal failed:`, error);
+  }
+
+  // 2. Firestore removal
+  try {
+    const firestoreRef = doc(db, 'inquiries', id);
+    await deleteDoc(firestoreRef);
+    console.log(`[FIRESTORE-DELETE] Success for ID: ${id}`);
+  } catch (error) {
+    console.warn(`[FIRESTORE-DELETE] Firestore removal failed:`, error);
   }
 }
 

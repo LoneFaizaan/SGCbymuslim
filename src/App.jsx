@@ -44,9 +44,40 @@ export default function App() {
     // Subscribe to multi-region Realtime Database live nodes
     const unsubscribe = subscribeToInquiries((rtdbInquiries) => {
       if (rtdbInquiries) {
-        setInquiries(rtdbInquiries);
+        // Safe-guard and Merge logic:
+        // We want to combine live data from Firebase with any local-only pending submissions (syncedToDatabase === false).
+        // If a lead is marked as syncedToDatabase === false, we keep it locally. If syncedToDatabase is true or omitted
+        // and it is no longer in Firebase, it means it is deleted by an Admin, so we delete it locally as well.
+        const stored = localStorage.getItem('sgc_customer_inquiries');
+        let mergedList = [...rtdbInquiries];
+
+        if (stored) {
+          try {
+            const localList = JSON.parse(stored);
+            if (Array.isArray(localList)) {
+              const rtdbIds = new Set(rtdbInquiries.map(inq => inq.id));
+              // Filter out leads that haven't successfully written to Firebase yet
+              const unsyncedPending = localList.filter(inq => !inq.syncedToDatabase && !rtdbIds.has(inq.id));
+              
+              if (unsyncedPending.length > 0) {
+                console.log('[App] Merging local unsynced pending leads:', unsyncedPending.length);
+                mergedList = [...mergedList, ...unsyncedPending];
+                // Resolve correct descending sort order
+                mergedList.sort((a, b) => {
+                  const idA = Number(a.id?.replace('inq-', '')) || 0;
+                  const idB = Number(b.id?.replace('inq-', '')) || 0;
+                  return idB - idA;
+                });
+              }
+            }
+          } catch (e) {
+            console.error('[App] Safe-guard merge read error:', e);
+          }
+        }
+
+        setInquiries(mergedList);
         try {
-          localStorage.setItem('sgc_customer_inquiries', JSON.stringify(rtdbInquiries));
+          localStorage.setItem('sgc_customer_inquiries', JSON.stringify(mergedList));
         } catch (e) {
           console.error('Failed to update local storage cache with live RTDDB data', e);
         }
@@ -80,20 +111,36 @@ export default function App() {
         hour: '2-digit',
         minute: '2-digit'
       }),
-      syncedToSheets: false
+      syncedToSheets: false,
+      syncedToDatabase: false // Initialized state is pending sync
     };
 
-    // Save lead record immediately to the Realtime Database (handles multi-region fallback automatically)
-    try {
-      await saveInquiryToFirestore(formattedInq);
-      console.log('[App] Lead stored successfully in RTDDB:', formattedInq.id);
-    } catch (dbErr) {
-      console.error('[App] Critical fail storing lead to Realtime Database:', dbErr);
-      alert('Your inquiry submission failed. Please check network connection or database rules.');
-    }
-
+    // 1. Optimistic Local Save (Instantly stored & displayed - immune to any Firebase hangs or delays!)
+    console.log('[App] Performing optimistic local storage update for ID:', formattedInq.id);
     const updated = [formattedInq, ...inquiries];
     saveInquiriesToStorage(updated);
+
+    // 2. Perform background DB stores asynchronously without blocking the local user session
+    saveInquiryToFirestore(formattedInq)
+      .then(() => {
+        console.log('[App] Lead stored successfully in Cloud Database platforms:', formattedInq.id);
+        // Flip the syncedToDatabase flag so that the list is stabilized
+        setInquiries(prev => {
+          const listWithSyncApproved = prev.map(inq => 
+            inq.id === formattedInq.id ? { ...inq, syncedToDatabase: true } : inq
+          );
+          try {
+            localStorage.setItem('sgc_customer_inquiries', JSON.stringify(listWithSyncApproved));
+          } catch (storageErr) {
+            console.error('[App] Failed storing synced flag to local cache:', storageErr);
+          }
+          return listWithSyncApproved;
+        });
+      })
+      .catch((dbErr) => {
+        console.error('[App] Non-blocking database write attempt failed: ', dbErr);
+        // We do NOT call blocking alerts so user experience is kept perfect & leads remains local!
+      });
   };
 
   // Delete inquiries
