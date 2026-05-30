@@ -4,7 +4,7 @@ import {
   X, Mail, Phone, Calendar, MessageSquare, Trash2, ClipboardCheck, 
   Eye, EyeOff, Search, Filter, 
   Download, FileText, Check, Save, ArrowLeft, Building, HelpCircle, HardDrive,
-  CheckCheck, AlertCircle
+  CheckCheck, AlertCircle, LogIn
 } from 'lucide-react';
 import { saveInquiryToFirestore, testRtdbConnections } from '../lib/firebase';
 
