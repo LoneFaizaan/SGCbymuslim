@@ -76,8 +76,9 @@ export default function Hero({ onExploreBusinesses, onAboutSgc }) {
             
             <img
               src={sgcBuilding}
-              alt="SGC Headquarters"
+              alt="SGC Group of Companies Headquarters - Trusted Gold Buyer &amp; Gold Loan Settlement Hub in Chandigarh, Mohali, Panchkula &amp; Zirakpur"
               referrerPolicy="no-referrer"
+              fetchPriority="high"
               className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
             />
             

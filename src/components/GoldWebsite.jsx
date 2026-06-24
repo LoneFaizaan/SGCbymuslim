@@ -176,8 +176,9 @@ export default function GoldWebsite({ onBackToParent, onSubmitInquiry }) {
             <div className="relative w-full max-w-[480px] aspect-square rounded-2xl overflow-hidden border border-yellow-500/20 shadow-2xl">
               <img
                 src={sgcGold}
-                alt="SGC Pure Gold repurchasers"
+                alt="SGC Pure Gold Buyers Chandigarh - Instant Gold Loan Settlement and Cash Payout Desk"
                 referrerPolicy="no-referrer"
+                loading="lazy"
                 className="w-full h-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#07070a] via-transparent to-transparent flex flex-col justify-end p-6">
@@ -247,8 +248,9 @@ export default function GoldWebsite({ onBackToParent, onSubmitInquiry }) {
               <div className="relative aspect-[4/3] sm:aspect-[1.1] rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(112,98,82,0.15)] border border-[#e5d9c9]">
                 <img
                   src={elderlyLadyGold}
-                  alt="Examining precious gold ornament jewelry"
+                  alt="Gold Jewelry Appraisal Chandigarh - SGC Trusted Valuation &amp; Gold Loan Assistance"
                   referrerPolicy="no-referrer"
+                  loading="lazy"
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#faf6f0]/50 via-transparent to-transparent"></div>

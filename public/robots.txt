@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+
+# SGC Group of Companies XML Sitemap for Google Search Indexation
+Sitemap: https://sgc-business-hub-917026721988.asia-southeast1.run.app/sitemap.xml
