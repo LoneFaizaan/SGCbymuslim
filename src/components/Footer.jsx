@@ -1,6 +1,6 @@
 import { Facebook, Instagram, MessageCircle, MapPin, Phone, Mail } from 'lucide-react';
 
-export default function Footer() {
+export default function Footer({ onOpenAboutPage }) {
   const scrollToSection = (id) => {
     const element = document.getElementById(id);
     if (element) {
@@ -68,7 +68,13 @@ export default function Footer() {
               return (
                 <li key={link}>
                   <button
-                    onClick={() => scrollToSection(ids[link])}
+                    onClick={() => {
+                      if (link === 'ABOUT US' && onOpenAboutPage) {
+                        onOpenAboutPage();
+                      } else {
+                        scrollToSection(ids[link]);
+                      }
+                    }}
                     className="text-gray-400 hover:text-yellow-500 transition-colors font-light hover:underline underline-offset-4"
                   >
                     {link}

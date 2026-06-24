@@ -1,7 +1,7 @@
 import { motion } from 'motion/react';
-import { Target, Eye, Compass, ShieldCheck } from 'lucide-react';
+import { Target, Eye, Compass, ShieldCheck, ChevronRight } from 'lucide-react';
 
-export default function AboutUs() {
+export default function AboutUs({ onOpenAboutPage }) {
   const tenets = [
     {
       icon: <Target className="w-5 h-5 text-yellow-500" />,
@@ -62,6 +62,18 @@ export default function AboutUs() {
                 </p>
               </div>
             </div>
+
+            {onOpenAboutPage && (
+              <div className="pt-2">
+                <button
+                  onClick={onOpenAboutPage}
+                  className="inline-flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-bold text-xs uppercase tracking-widest px-6 py-3.5 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer hover:shadow-[0_4px_15px_rgba(234,179,8,0.3)]"
+                >
+                  <span>Meet Our Leadership Team</span>
+                  <ChevronRight className="w-4 h-4 shrink-0" />
+                </button>
+              </div>
+            )}
           </motion.div>
 
           {/* Right Column Mission/Vision/Values Row */}

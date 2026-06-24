@@ -13,6 +13,7 @@ import CompanyAdminDashboard from './components/CompanyAdminDashboard';
 import GoldWebsite from './components/GoldWebsite';
 import CateringWebsite from './components/CateringWebsite';
 import RealEstateWebsite from './components/RealEstateWebsite';
+import AboutPage from './components/AboutPage';
 import { appendInquiriesToSpreadsheet } from './lib/googleSheets';
 import { sendInquiryEmail } from './lib/gmail';
 import ToastContainer from './components/ToastContainer';
@@ -182,6 +183,21 @@ export default function App() {
     );
   }
 
+  if (activeWebsite === 'about') {
+    return (
+      <AboutPage 
+        onBackToParent={() => {
+          setActiveWebsite('sgc');
+          window.scrollTo(0, 0);
+        }}
+        onOpenInquiries={() => setIsInboxOpen(true)}
+        inquiriesCount={inquiries.length}
+        onOpenAdminDashboard={() => setIsAdminDashboardOpen(true)}
+        onSubmitInquiry={handleAddInquiry}
+      />
+    );
+  }
+
   return (
     <div className="relative min-h-screen bg-[#060608] font-sans antialiased text-[#f3f4f6]">
       
@@ -190,6 +206,10 @@ export default function App() {
         onOpenInquiries={() => setIsInboxOpen(true)}
         inquiriesCount={inquiries.length}
         onOpenAdminDashboard={() => setIsAdminDashboardOpen(true)}
+        onOpenAboutPage={() => {
+          setActiveWebsite('about');
+          window.scrollTo(0, 0);
+        }}
       />
 
       <main className="relative pb-4">
@@ -197,14 +217,22 @@ export default function App() {
         {/* Hero Section */}
         <Hero 
           onExploreBusinesses={() => scrollToSection('businesses')}
-          onAboutSgc={() => scrollToSection('about')}
+          onAboutSgc={() => {
+            setActiveWebsite('about');
+            window.scrollTo(0, 0);
+          }}
         />
 
         {/* Translucent Key Statistics Bar overlay */}
         <StatsBar />
 
         {/* About the parent company structure (SGC) and values */}
-        <AboutUs />
+        <AboutUs 
+          onOpenAboutPage={() => {
+            setActiveWebsite('about');
+            window.scrollTo(0, 0);
+          }}
+        />
 
         {/* Core modular business divisions (cards with details popup trigger) */}
         <BusinessSection 
@@ -229,7 +257,12 @@ export default function App() {
       </main>
 
       {/* Ornate Sitemaps Footer */}
-      <Footer />
+      <Footer 
+        onOpenAboutPage={() => {
+          setActiveWebsite('about');
+          window.scrollTo(0, 0);
+        }}
+      />
 
       {/* Subsidary Interactive Dialog Modals (Gold estimator, Catering cost menu planner) */}
       <SubsidariesModals

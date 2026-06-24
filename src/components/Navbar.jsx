@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Phone, Menu, X, Building2, ShieldCheck } from 'lucide-react';
 
-export default function Navbar({ onOpenInquiries, inquiriesCount, onOpenAdminDashboard }) {
+export default function Navbar({ onOpenInquiries, inquiriesCount, onOpenAdminDashboard, onOpenAboutPage }) {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
@@ -97,7 +97,13 @@ export default function Navbar({ onOpenInquiries, inquiriesCount, onOpenAdminDas
             {navLinks.map((link) => (
               <button
                 key={link.id}
-                onClick={() => scrollToSection(link.id)}
+                onClick={() => {
+                  if (link.id === 'about' && onOpenAboutPage) {
+                    onOpenAboutPage();
+                  } else {
+                    scrollToSection(link.id);
+                  }
+                }}
                 className={`relative py-2 text-xs font-semibold tracking-widest transition-colors ${
                   activeSection === link.id
                     ? 'text-yellow-500'
@@ -185,7 +191,14 @@ export default function Navbar({ onOpenInquiries, inquiriesCount, onOpenAdminDas
               {navLinks.map((link) => (
                 <button
                   key={link.id}
-                  onClick={() => scrollToSection(link.id)}
+                  onClick={() => {
+                    if (link.id === 'about' && onOpenAboutPage) {
+                      setIsOpen(false);
+                      onOpenAboutPage();
+                    } else {
+                      scrollToSection(link.id);
+                    }
+                  }}
                   className={`block w-full text-left py-3 px-4 text-sm font-semibold tracking-widest rounded-lg transition-all ${
                     activeSection === link.id
                       ? 'text-yellow-500 bg-yellow-500/5 border-l-2 border-yellow-500 pl-3'
