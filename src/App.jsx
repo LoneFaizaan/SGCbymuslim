@@ -14,6 +14,7 @@ import GoldWebsite from './components/GoldWebsite';
 import CateringWebsite from './components/CateringWebsite';
 import RealEstateWebsite from './components/RealEstateWebsite';
 import AboutPage from './components/AboutPage';
+import { saveInquiryToFirestore } from './lib/firestorePlaceholder';
 import { appendInquiriesToSpreadsheet } from './lib/googleSheets';
 import { sendInquiryEmail } from './lib/gmail';
 import ToastContainer from './components/ToastContainer';
@@ -94,12 +95,55 @@ export default function App() {
     const updated = [formattedInq, ...inquiries];
     saveInquiriesToStorage(updated);
 
+    // 1. FUTURE FIRESTORE INTEGRATION HOOK
+    // This function conforms exactly to the database schema and handles the trigger.
+    // Your developer/friend can connect the live database in 'src/lib/firestorePlaceholder.js'.
+    try {
+      await saveInquiryToFirestore(formattedInq);
+    } catch (dbErr) {
+      console.warn('[App] Firestore blueprint placeholder logged an issue:', dbErr);
+    }
+
     addToast(
       'Inquiry Submitted!',
       'success',
-      `Your inquiry has been cached securely in the browser offline local storage.`,
+      `Saved locally. Redirecting to SGC WhatsApp Desk...`,
       4000
     );
+
+    // 2. WHATSAPP REDIRECTION WORKFLOW
+    // Centralized redirection to the SGC J&K Mobile WhatsApp Desk: +91 78894 34741
+    const divisionLabels = {
+      gold: '👑 SGC Gold Buying & Loan Settlement',
+      real_estate: '🏢 SGC Real Estate Advisory',
+      catering: '🍽️ Salafiya Premium Catering Services',
+      general: '💼 General Corporate Business Inquiry'
+    };
+
+    const label = divisionLabels[formattedInq.businessSection] || divisionLabels.general;
+    const whatsappMessage = `*SGC GROUP OF COMPANIES - CUSTOMER INQUIRY*\n\n` +
+      `*Division:* ${label}\n` +
+      `*Client Name:* ${formattedInq.name}\n` +
+      `*Contact Number:* ${formattedInq.phone}\n` +
+      `*Email Address:* ${formattedInq.email || 'Not provided'}\n` +
+      `*Message / Request Details:* ${formattedInq.message || 'No additional details provided'}\n\n` +
+      `_Sent securely via SGC Corporate Portal_`;
+
+    const encodedText = encodeURIComponent(whatsappMessage);
+    const whatsappUrl = `https://wa.me/917889434741?text=${encodedText}`;
+
+    // Perform secure, responsive redirect after 1.2s so the user sees the confirmation toast
+    setTimeout(() => {
+      try {
+        const opened = window.open(whatsappUrl, '_blank');
+        if (!opened || opened.closed || typeof opened.closed === 'undefined') {
+          // Fallback if browser popup blocker stops new tab
+          window.location.href = whatsappUrl;
+        }
+      } catch (err) {
+        window.location.href = whatsappUrl;
+      }
+    }, 1200);
   };
 
   // Delete inquiries

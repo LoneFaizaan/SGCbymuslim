@@ -554,6 +554,30 @@ export default function CompanyAdminDashboard({
 
 
 
+              {/* FIRESTORE DEVELOPER INTEGRATION BANNER */}
+              <div className="bg-gradient-to-r from-yellow-500/5 to-amber-500/5 border border-yellow-500/20 rounded-2xl p-5 space-y-3.5">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 text-left">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 animate-pulse shrink-0"></span>
+                      <span className="text-xs font-bold text-white uppercase tracking-wider font-sans">Developer Database Status: Ready for Live Connection</span>
+                    </div>
+                    <p className="text-xs text-gray-300 font-light leading-relaxed">
+                      All frontend forms and admin tables have been modularly decoupled and are fully prepared to synchronize with <strong className="text-yellow-500">Firebase Firestore</strong>. Form data is captured in fully structured models in real-time.
+                    </p>
+                    <p className="text-[11px] text-gray-400">
+                      📝 Connection Hook Blueprint: <code className="text-yellow-400 font-mono bg-black/40 px-1.5 py-0.5 rounded">src/lib/firestorePlaceholder.js</code>
+                    </p>
+                  </div>
+                  <div className="shrink-0 bg-[#0d111a] border border-white/5 p-3 rounded-xl flex flex-col justify-center space-y-1 text-[10px] text-gray-400 font-mono">
+                    <div className="font-bold text-yellow-500 uppercase">INTEGRATION STEPS:</div>
+                    <div>1. Install: <span className="text-white">npm install firebase</span></div>
+                    <div>2. Set configuration in blueprint file</div>
+                    <div>3. Uncomment DB trigger hook functions</div>
+                  </div>
+                </div>
+              </div>
+
               {/* LOCAL STORAGE DIAGNOSTIC MONITOR */}
               <div className="bg-[#101424] border border-yellow-500/15 rounded-2xl p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
