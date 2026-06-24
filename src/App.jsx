@@ -104,6 +104,37 @@ export default function App() {
       console.warn('[App] Firestore blueprint placeholder logged an issue:', dbErr);
     }
 
+    // 1.5. FORMSPREE LEAD ROUTING WORKFLOW
+    // Send form data automatically to the requested Formspree endpoint: https://formspree.io/f/xzdldwdo
+    try {
+      fetch('https://formspree.io/f/xzdldwdo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          inquiryId: formattedInq.id,
+          name: formattedInq.name,
+          phone: formattedInq.phone,
+          email: formattedInq.email || 'Not provided',
+          division: formattedInq.businessSection,
+          message: formattedInq.message || 'No additional details provided',
+          dateSubmitted: formattedInq.date
+        })
+      }).then(res => {
+        if (res.ok) {
+          console.log('[App] Successfully dispatched lead to Formspree.');
+        } else {
+          console.warn('[App] Formspree returned non-ok status.');
+        }
+      }).catch(err => {
+        console.error('[App] Error dispatching to Formspree:', err);
+      });
+    } catch (formspreeErr) {
+      console.error('[App] Formspree submission failed:', formspreeErr);
+    }
+
     addToast(
       'Inquiry Submitted!',
       'success',
