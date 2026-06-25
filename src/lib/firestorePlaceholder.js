@@ -51,6 +51,7 @@ const saveLocalInquiries = (inquiries) => {
   }
 };
 
+
 // Listen to local storage changes from other tabs as well
 window.addEventListener('storage', (event) => {
   if (event.key === 'sgc_customer_inquiries') {
@@ -211,6 +212,7 @@ export function subscribeToSupabaseRealtime() {
     return () => {};
   }
 }
+
 
 // 4. Google Login
 export async function loginWithGoogle() {

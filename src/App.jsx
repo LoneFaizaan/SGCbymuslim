@@ -17,9 +17,9 @@ import AboutPage from './components/AboutPage';
 import { 
   saveInquiryToFirestore, 
   auth, 
-  subscribeToFirestoreInquiries, 
-  syncWithSupabase, 
-  subscribeToSupabaseRealtime 
+  subscribeToFirestoreInquiries,
+  syncWithSupabase,
+  subscribeToSupabaseRealtime
 } from './lib/firestorePlaceholder';
 import { deleteInquiryFromSupabase } from './lib/supabaseClient';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -90,11 +90,11 @@ export default function App() {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       if (user && ADMIN_EMAILS.includes(user.email)) {
-        console.log('[App] Admin verified. Initializing Firestore real-time listener.');
-        
+        console.log('[App] Admin verified. Initializing Firestore + Supabase real-time listener.');
+
         // Fetch and merge Supabase inquiries initially
         syncWithSupabase();
-        
+
         // Subscribe to real-time additions/updates in Supabase via Postgres Replication
         unsubscribeSupabase = subscribeToSupabaseRealtime();
 
