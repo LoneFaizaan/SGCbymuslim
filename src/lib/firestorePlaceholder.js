@@ -1,5 +1,11 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { 
+  supabase, 
+  saveInquiryToSupabase, 
+  updateInquiryInSupabase, 
+  fetchSupabaseInquiries 
+} from './supabaseClient';
 
 // Safe default fallback config so the app never crashes
 const dummyFirebaseConfig = {
@@ -67,9 +73,9 @@ export function subscribeToFirestoreInquiries(callback) {
   };
 }
 
-// 2. Save inquiry to firestore (local-storage fallback)
+// 2. Save inquiry to firestore + Supabase
 export async function saveInquiryToFirestore(inquiryData) {
-  console.log('[Firestore Sync] Saving inquiry:', inquiryData);
+  console.log('[Sync Engine] Saving inquiry to Firestore/Local:', inquiryData);
   const current = getLocalInquiries();
   
   // Append or insert at beginning
@@ -82,12 +88,21 @@ export async function saveInquiryToFirestore(inquiryData) {
   
   const updated = [newInquiry, ...current];
   saveLocalInquiries(updated);
+
+  // Parallel sync to Supabase (non-blocking)
+  try {
+    console.log('[Sync Engine] Syncing new lead to Supabase...', newInquiry.id);
+    await saveInquiryToSupabase(newInquiry);
+  } catch (supErr) {
+    console.error('[Sync Engine] Supabase insert failed:', supErr);
+  }
+  
   return newInquiry;
 }
 
-// 3. Update inquiry status/fields
+// 3. Update inquiry status/fields on both Firestore + Supabase
 export async function updateInquiryInFirestore(id, updatedFields) {
-  console.log('[Firestore Sync] Updating inquiry:', id, updatedFields);
+  console.log('[Sync Engine] Updating inquiry:', id, updatedFields);
   const current = getLocalInquiries();
   const updated = current.map(inq => {
     if (inq.id === id) {
@@ -96,7 +111,105 @@ export async function updateInquiryInFirestore(id, updatedFields) {
     return inq;
   });
   saveLocalInquiries(updated);
+
+  // Parallel sync to Supabase (non-blocking)
+  try {
+    console.log('[Sync Engine] Syncing updated fields to Supabase for ID:', id, updatedFields);
+    await updateInquiryInSupabase(id, updatedFields);
+  } catch (supErr) {
+    console.error('[Sync Engine] Supabase update failed:', supErr);
+  }
+
   return true;
+}
+
+/**
+ * Fetch and synchronize data from Supabase to merge into local cache
+ */
+export async function syncWithSupabase() {
+  console.log('[Sync Engine] Pulling latest leads from Supabase to merge...');
+  try {
+    const supabaseInquiries = await fetchSupabaseInquiries();
+    if (!supabaseInquiries) {
+      console.log('[Sync Engine] Supabase fetch returned empty.');
+      return getLocalInquiries();
+    }
+
+    const localInquiries = getLocalInquiries();
+    const mergedMap = new Map();
+
+    // 1. Populate local first
+    localInquiries.forEach(inq => {
+      if (inq && inq.id) {
+        mergedMap.set(inq.id, inq);
+      }
+    });
+
+    // 2. Merge Supabase (overwriting or complementing)
+    supabaseInquiries.forEach(supInq => {
+      if (!supInq || !supInq.id) return;
+      const existing = mergedMap.get(supInq.id);
+      if (existing) {
+        // Merge them, choosing whichever has most updated values
+        mergedMap.set(supInq.id, {
+          ...existing,
+          ...supInq,
+          status: supInq.status || existing.status || 'new',
+          adminNotes: supInq.adminNotes || existing.adminNotes || '',
+        });
+      } else {
+        mergedMap.set(supInq.id, supInq);
+      }
+    });
+
+    const mergedList = Array.from(mergedMap.values());
+
+    // Sort newest first
+    mergedList.sort((a, b) => {
+      const getTimestamp = (inq) => {
+        if (typeof inq.id === 'string' && inq.id.startsWith('inq-')) {
+          const parts = inq.id.split('-');
+          if (parts[1]) return parseInt(parts[1]) || 0;
+        }
+        if (inq.createdAt && typeof inq.createdAt.seconds === 'number') {
+          return inq.createdAt.seconds * 1000;
+        }
+        return 0;
+      };
+      return getTimestamp(b) - getTimestamp(a);
+    });
+
+    saveLocalInquiries(mergedList);
+    console.log(`[Sync Engine] Dual sync completed. Total leads in memory: ${mergedList.length}`);
+    return mergedList;
+  } catch (err) {
+    console.error('[Sync Engine] Error running syncWithSupabase:', err);
+    return getLocalInquiries();
+  }
+}
+
+/**
+ * Setup a websocket listener for real-time Postgres insertions/updates on Supabase
+ */
+export function subscribeToSupabaseRealtime() {
+  console.log('[Sync Engine] Registering Supabase Realtime channel...');
+  try {
+    const channel = supabase
+      .channel('public:inquiries')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inquiries' }, (payload) => {
+        console.log('[Sync Engine] Postgres change detected. Re-syncing...', payload);
+        syncWithSupabase();
+      })
+      .subscribe();
+
+    return () => {
+      console.log('[Sync Engine] Unsubscribing from Supabase Realtime.');
+      supabase.removeChannel(channel);
+    };
+  } catch (err) {
+    console.error('[Sync Engine] Failed to subscribe to Supabase Realtime:', err);
+    return () => {};
+  }
 }
 
 // 4. Google Login
@@ -128,3 +241,4 @@ export async function logoutUser() {
     console.error('Error signing out of real Firebase:', err);
   }
 }
+

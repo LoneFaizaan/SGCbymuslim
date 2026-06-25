@@ -14,7 +14,14 @@ import GoldWebsite from './components/GoldWebsite';
 import CateringWebsite from './components/CateringWebsite';
 import RealEstateWebsite from './components/RealEstateWebsite';
 import AboutPage from './components/AboutPage';
-import { saveInquiryToFirestore, auth, subscribeToFirestoreInquiries } from './lib/firestorePlaceholder';
+import { 
+  saveInquiryToFirestore, 
+  auth, 
+  subscribeToFirestoreInquiries, 
+  syncWithSupabase, 
+  subscribeToSupabaseRealtime 
+} from './lib/firestorePlaceholder';
+import { deleteInquiryFromSupabase } from './lib/supabaseClient';
 import { onAuthStateChanged } from 'firebase/auth';
 import { appendInquiriesToSpreadsheet } from './lib/googleSheets';
 import { sendInquiryEmail } from './lib/gmail';
@@ -79,10 +86,18 @@ export default function App() {
   // Sync with Firestore in Real-time if admin is logged in
   useEffect(() => {
     let unsubscribeSnap = null;
+    let unsubscribeSupabase = null;
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       if (user && ADMIN_EMAILS.includes(user.email)) {
         console.log('[App] Admin verified. Initializing Firestore real-time listener.');
+        
+        // Fetch and merge Supabase inquiries initially
+        syncWithSupabase();
+        
+        // Subscribe to real-time additions/updates in Supabase via Postgres Replication
+        unsubscribeSupabase = subscribeToSupabaseRealtime();
+
         unsubscribeSnap = subscribeToFirestoreInquiries((liveInquiries) => {
           // Detect and alert on new real-time inquiries/leads
           if (prevInquiryIdsRef.current !== null && Array.isArray(liveInquiries)) {
@@ -123,6 +138,10 @@ export default function App() {
           unsubscribeSnap();
           unsubscribeSnap = null;
         }
+        if (unsubscribeSupabase) {
+          unsubscribeSupabase();
+          unsubscribeSupabase = null;
+        }
         try {
           const stored = localStorage.getItem('sgc_customer_inquiries');
           if (stored) {
@@ -141,6 +160,9 @@ export default function App() {
       unsubscribeAuth();
       if (unsubscribeSnap) {
         unsubscribeSnap();
+      }
+      if (unsubscribeSupabase) {
+        unsubscribeSupabase();
       }
     };
   }, []);
@@ -262,10 +284,18 @@ export default function App() {
     const filtered = inquiries.filter(i => i.id !== id);
     saveInquiriesToStorage(filtered);
 
+    // Sync deletion to Supabase
+    try {
+      await deleteInquiryFromSupabase(id);
+      console.log('[Sync Engine] Deleted inquiry from Supabase:', id);
+    } catch (err) {
+      console.error('[Sync Engine] Failed to delete from Supabase:', err);
+    }
+
     addToast(
       'Inquiry Deleted',
       'success',
-      'The inquiry has been removed successfully from your active sessions.',
+      'The inquiry has been removed successfully from your active sessions and Supabase.',
       3500
     );
   };
