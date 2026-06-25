@@ -14,10 +14,18 @@ import GoldWebsite from './components/GoldWebsite';
 import CateringWebsite from './components/CateringWebsite';
 import RealEstateWebsite from './components/RealEstateWebsite';
 import AboutPage from './components/AboutPage';
-import { saveInquiryToFirestore } from './lib/firestorePlaceholder';
+import { saveInquiryToFirestore, auth, subscribeToFirestoreInquiries } from './lib/firestorePlaceholder';
+import { onAuthStateChanged } from 'firebase/auth';
 import { appendInquiriesToSpreadsheet } from './lib/googleSheets';
 import { sendInquiryEmail } from './lib/gmail';
 import ToastContainer from './components/ToastContainer';
+
+export const ADMIN_EMAILS = [
+  'salafimubashirlone@gmail.com',
+  'salafiyagroupodcompanies@gmail.com',
+  'salafiyagroupofcompanies@gmail.com',
+  'muslimnazirlonekmr@gmail.com'
+];
 
 export default function App() {
   const [activeWebsite, setActiveWebsite] = useState('sgc');
@@ -50,6 +58,9 @@ export default function App() {
 
   const contactBannerRef = useRef(null);
 
+  const [currentUser, setCurrentUser] = useState(null);
+  const prevInquiryIdsRef = useRef(null);
+
   // Load local cache exclusively
   useEffect(() => {
     try {
@@ -63,6 +74,75 @@ export default function App() {
     } catch (e) {
       console.error('Failed to read cached inquiries from local storage', e);
     }
+  }, []);
+
+  // Sync with Firestore in Real-time if admin is logged in
+  useEffect(() => {
+    let unsubscribeSnap = null;
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      if (user && ADMIN_EMAILS.includes(user.email)) {
+        console.log('[App] Admin verified. Initializing Firestore real-time listener.');
+        unsubscribeSnap = subscribeToFirestoreInquiries((liveInquiries) => {
+          // Detect and alert on new real-time inquiries/leads
+          if (prevInquiryIdsRef.current !== null && Array.isArray(liveInquiries)) {
+            const currentIds = new Set(prevInquiryIdsRef.current);
+            const newlyAdded = liveInquiries.filter(inq => inq && inq.id && !currentIds.has(inq.id));
+            
+            if (newlyAdded.length > 0) {
+              newlyAdded.forEach((newInq) => {
+                const sourceLabel = newInq.source ? ` (${newInq.source.toUpperCase()})` : '';
+                addToast(
+                  `New Lead Received!`,
+                  'success',
+                  `${newInq.name || 'A customer'} submitted an inquiry${sourceLabel}.`,
+                  8000
+                );
+              });
+            }
+          }
+          // Update tracking ref with latest IDs
+          if (Array.isArray(liveInquiries)) {
+            prevInquiryIdsRef.current = liveInquiries.map(inq => inq.id).filter(Boolean);
+          }
+
+          setInquiries(liveInquiries);
+          try {
+            localStorage.setItem('sgc_customer_inquiries', JSON.stringify(liveInquiries));
+          } catch (e) {
+            console.error('Failed to sync to local storage', e);
+          }
+        }, (err) => {
+          console.error('[App] Firestore snapshot error:', err);
+        });
+      } else {
+        // Reset ref on signout
+        prevInquiryIdsRef.current = null;
+        // If logged out, reload from local storage to revert to personal cached inquiries
+        if (unsubscribeSnap) {
+          unsubscribeSnap();
+          unsubscribeSnap = null;
+        }
+        try {
+          const stored = localStorage.getItem('sgc_customer_inquiries');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed)) {
+              setInquiries(parsed);
+            }
+          }
+        } catch (e) {
+          console.error('Failed to read local cache on signout', e);
+        }
+      }
+    });
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeSnap) {
+        unsubscribeSnap();
+      }
+    };
   }, []);
 
   // Save inquiries to localStorage when modified

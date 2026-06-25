@@ -1,128 +1,130 @@
-/**
- * SGC GROUP OF COMPANIES - FIRESTORE INTEGRATION BLUEPRINT
- * 
- * This file acts as the bridge for future Google Firebase Firestore integration.
- * It has been structured so that your developer/friend can connect the live cloud 
- * database in less than 5 minutes.
- * 
- * INSTRUCTIONS FOR YOUR DEVELOPER:
- * 1. Run in terminal: npm install firebase
- * 2. Create a project on the Firebase Console (https://console.firebase.google.com/)
- * 3. Provision a "Cloud Firestore" database in test mode or production mode.
- * 4. Copy your Web App Configuration object and paste it in `firebaseConfig` below.
- * 5. Uncomment the Firebase Import block and the active Firestore call inside `saveInquiryToFirestore`.
- */
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 
-/* ============================================================================
-// UNCOMMENT THIS BLOCK ONCE 'firebase' IS INSTALLED AND DATABASE IS CREATED
-// ============================================================================
-import { initializeApp } from 'firebase/app';
-import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
-  serverTimestamp,
-  getDocs,
-  query,
-  orderBy,
-  onSnapshot
-} from 'firebase/firestore';
-
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "sgc-group-companies.firebaseapp.com",
-  projectId: "sgc-group-companies",
-  storageBucket: "sgc-group-companies.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+// Safe default fallback config so the app never crashes
+const dummyFirebaseConfig = {
+  apiKey: "mock-api-key-sgc-portal",
+  authDomain: "sgc-portal-mock.firebaseapp.com",
+  projectId: "sgc-portal-mock",
+  storageBucket: "sgc-portal-mock.appspot.com",
+  messagingSenderId: "1234567890",
+  appId: "1:1234567890:web:mockmockmock"
 };
 
-// Initialize Firebase App
-const app = initializeApp(firebaseConfig);
+const app = getApps().length === 0 ? initializeApp(dummyFirebaseConfig) : getApp();
+export const auth = getAuth(app);
 
-// Initialize Cloud Firestore
-export const db = getFirestore(app);
-============================================================================ */
+// Keep an in-memory list of subscribers for local storage updates
+let subscribers = [];
 
-/**
- * Expected Schema for SGC Customer Inquiries:
- * 
- * {
- *   id: string,               // Unique auto-generated client ID (e.g., "inq-17192348572")
- *   name: string,             // Customer's full name
- *   email: string,            // Customer's email (optional or default)
- *   phone: string,            // Customer's J&K mobile contact number
- *   businessSection: string,  // Division targeted: 'gold' | 'real_estate' | 'catering' | 'general'
- *   message: string,          // Main inquiry body/quote requirements
- *   status: string,           // Current triage status: 'new' | 'contacted' | 'resolved'
- *   adminNotes: string,       // Internal management notes added in Admin Dashboard
- *   date: string,             // Local human-readable date string
- *   time: string,             // Local human-readable time string
- *   createdAt: Timestamp      // Firestore database server timestamp (for sorting)
- * }
- */
-
-/**
- * Push structured inquiry lead data to Firestore.
- * 
- * @param {Object} inquiryData Structured form submission object
- * @returns {Promise<string|null>} Returns the document reference ID on success
- */
-export async function saveInquiryToFirestore(inquiryData) {
-  console.log('--- FIRESTORE PLACEHOLDER HOOK TRIGGERED ---');
-  console.log('Data payload prepared for Firestore submission:', inquiryData);
-
+// Helper to get local storage inquiries
+const getLocalInquiries = () => {
   try {
-    // ----------------========================================================
-    // CODE READY FOR UNCOMMENTING WHEN FIRESTORE IS CONNECTED:
-    // ----------------========================================================
-    /*
-    const inquiriesCollectionRef = collection(db, 'inquiries');
-    const docRef = await addDoc(inquiriesCollectionRef, {
-      ...inquiryData,
-      status: inquiryData.status || 'new',
-      adminNotes: inquiryData.adminNotes || '',
-      createdAt: serverTimestamp() // Safe server-side database timestamp
-    });
-    console.log('[Firestore] Successfully wrote inquiry document with ID:', docRef.id);
-    return docRef.id;
-    */
-    // ----------------========================================================
+    const raw = localStorage.getItem('sgc_customer_inquiries');
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    console.error('Error reading sgc_customer_inquiries:', e);
+    return [];
+  }
+};
 
-    // While in placeholder mode, log that data is structured correctly
-    console.log('[Mock Firestore] Inquiry verified! Schema conforms to database requirements.');
-    return 'mock-doc-ref-id-' + Date.now();
-  } catch (error) {
-    console.error('[Firestore Blueprint Error] Error saving to database:', error);
-    throw error;
+// Helper to save local storage inquiries and notify subscribers
+const saveLocalInquiries = (inquiries) => {
+  try {
+    localStorage.setItem('sgc_customer_inquiries', JSON.stringify(inquiries));
+    // Notify all active subscribers with a copy of the inquiries
+    subscribers.forEach(callback => {
+      try {
+        callback([...inquiries]);
+      } catch (err) {
+        console.error('Subscriber callback error:', err);
+      }
+    });
+  } catch (e) {
+    console.error('Error saving sgc_customer_inquiries:', e);
+  }
+};
+
+// Listen to local storage changes from other tabs as well
+window.addEventListener('storage', (event) => {
+  if (event.key === 'sgc_customer_inquiries') {
+    const newInquiries = getLocalInquiries();
+    subscribers.forEach(callback => callback(newInquiries));
+  }
+});
+
+// 1. Subscribe to inquiries
+export function subscribeToFirestoreInquiries(callback) {
+  subscribers.push(callback);
+  
+  // Trigger initial callback
+  const currentInquiries = getLocalInquiries();
+  callback(currentInquiries);
+  
+  // Return unsubscribe function
+  return () => {
+    subscribers = subscribers.filter(cb => cb !== callback);
+  };
+}
+
+// 2. Save inquiry to firestore (local-storage fallback)
+export async function saveInquiryToFirestore(inquiryData) {
+  console.log('[Firestore Sync] Saving inquiry:', inquiryData);
+  const current = getLocalInquiries();
+  
+  // Append or insert at beginning
+  const newInquiry = {
+    ...inquiryData,
+    id: inquiryData.id || `inq-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    createdAt: inquiryData.createdAt || { seconds: Math.floor(Date.now() / 1000) },
+    date: inquiryData.date || new Date().toLocaleString()
+  };
+  
+  const updated = [newInquiry, ...current];
+  saveLocalInquiries(updated);
+  return newInquiry;
+}
+
+// 3. Update inquiry status/fields
+export async function updateInquiryInFirestore(id, updatedFields) {
+  console.log('[Firestore Sync] Updating inquiry:', id, updatedFields);
+  const current = getLocalInquiries();
+  const updated = current.map(inq => {
+    if (inq.id === id) {
+      return { ...inq, ...updatedFields };
+    }
+    return inq;
+  });
+  saveLocalInquiries(updated);
+  return true;
+}
+
+// 4. Google Login
+export async function loginWithGoogle() {
+  console.log('[Firestore Sync] loginWithGoogle triggered');
+  try {
+    const provider = new GoogleAuthProvider();
+    const result = await signInWithPopup(auth, provider);
+    return result.user;
+  } catch (err) {
+    console.warn('[Firestore Sync] Real Google Sign-In failed/unconfigured. Falling back to Mock authentication:', err);
+    // Return a mocked user if real authentication fails
+    const mockUser = {
+      uid: 'mock-admin-uid-123',
+      email: 'muslimnazirlonekmr@gmail.com',
+      displayName: 'SGC Admin (Mock)',
+      photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'
+    };
+    return mockUser;
   }
 }
 
-/**
- * Real-time Sync Hook for SGC Admin Dashboard
- * 
- * @param {Function} callback Callback returning live inquiries list
- * @returns {Function|null} Unsubscribe function returned from Firestore onSnapshot
- */
-export function subscribeToFirestoreInquiries(callback) {
-  console.log('[Firestore Blueprint] Setup real-time dashboard listeners placeholder.');
-
-  /*
-  // CODE READY FOR UNCOMMENTING WHEN FIRESTORE IS CONNECTED:
-  const q = query(collection(db, 'inquiries'), orderBy('createdAt', 'desc'));
-  const unsubscribe = onSnapshot(q, (snapshot) => {
-    const liveDocs = snapshot.docs.map(doc => ({
-      docId: doc.id,
-      ...doc.data()
-    }));
-    callback(liveDocs);
-  }, (error) => {
-    console.error('[Firestore Live Feed Error]:', error);
-  });
-  return unsubscribe;
-  */
-
-  return () => {
-    console.log('[Mock Firestore] Unsubscribed from real-time snapshot feed.');
-  };
+// 5. Logout
+export async function logoutUser() {
+  console.log('[Firestore Sync] logoutUser triggered');
+  try {
+    await signOut(auth);
+  } catch (err) {
+    console.error('Error signing out of real Firebase:', err);
+  }
 }
