@@ -35,7 +35,116 @@ export const ADMIN_EMAILS = [
 ];
 
 export default function App() {
-  const [activeWebsite, setActiveWebsite] = useState('sgc');
+  const [activeWebsite, setActiveWebsite] = useState(() => {
+    try {
+      const path = decodeURIComponent(window.location.pathname).toLowerCase();
+      const hash = decodeURIComponent(window.location.hash).toLowerCase();
+      const params = new URLSearchParams(window.location.search);
+      
+      if (
+        path.includes('sgc gold') || 
+        path.includes('gold') || 
+        hash.includes('gold') || 
+        params.get('division') === 'gold'
+      ) {
+        return 'gold';
+      }
+      if (
+        path.includes('catering') || 
+        hash.includes('catering') || 
+        params.get('division') === 'catering'
+      ) {
+        return 'catering';
+      }
+      if (
+        path.includes('real_estate') || 
+        path.includes('realestate') || 
+        hash.includes('real_estate') || 
+        params.get('division') === 'real_estate'
+      ) {
+        return 'real_estate';
+      }
+      if (
+        path.includes('about') || 
+        hash.includes('about') || 
+        params.get('division') === 'about'
+      ) {
+        return 'about';
+      }
+    } catch (e) {
+      console.warn('Failed to parse active website from URL', e);
+    }
+    return 'sgc';
+  });
+
+  // URL sync logic to enable clean, bookmarkable URLs (like /SGC Gold or /Catering)
+  useEffect(() => {
+    try {
+      const currentPath = decodeURIComponent(window.location.pathname).toLowerCase();
+      if (activeWebsite === 'gold' && !currentPath.includes('sgc gold') && !currentPath.includes('gold')) {
+        window.history.pushState({ website: 'gold' }, '', '/SGC Gold');
+      } else if (activeWebsite === 'catering' && !currentPath.includes('catering')) {
+        window.history.pushState({ website: 'catering' }, '', '/Catering');
+      } else if (activeWebsite === 'real_estate' && !currentPath.includes('real_estate') && !currentPath.includes('realestate')) {
+        window.history.pushState({ website: 'real_estate' }, '', '/Real Estate');
+      } else if (activeWebsite === 'about' && !currentPath.includes('about')) {
+        window.history.pushState({ website: 'about' }, '', '/About');
+      } else if (activeWebsite === 'sgc' && currentPath !== '/' && currentPath !== '') {
+        window.history.pushState({ website: 'sgc' }, '', '/');
+      }
+    } catch (e) {
+      console.warn('Failed to sync state to URL bar', e);
+    }
+  }, [activeWebsite]);
+
+  // Listener to handle browser Back and Forward navigation buttons gracefully
+  useEffect(() => {
+    const handlePopState = () => {
+      try {
+        const path = decodeURIComponent(window.location.pathname).toLowerCase();
+        const hash = decodeURIComponent(window.location.hash).toLowerCase();
+        const params = new URLSearchParams(window.location.search);
+        
+        if (
+          path.includes('sgc gold') || 
+          path.includes('gold') || 
+          hash.includes('gold') || 
+          params.get('division') === 'gold'
+        ) {
+          setActiveWebsite('gold');
+        } else if (
+          path.includes('catering') || 
+          hash.includes('catering') || 
+          params.get('division') === 'catering'
+        ) {
+          setActiveWebsite('catering');
+        } else if (
+          path.includes('real_estate') || 
+          path.includes('realestate') || 
+          hash.includes('real_estate') || 
+          params.get('division') === 'real_estate'
+        ) {
+          setActiveWebsite('real_estate');
+        } else if (
+          path.includes('about') || 
+          hash.includes('about') || 
+          params.get('division') === 'about'
+        ) {
+          setActiveWebsite('about');
+        } else {
+          setActiveWebsite('sgc');
+        }
+      } catch (e) {
+        console.warn('Failed to parse URL in popstate listener', e);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
   const [activeModalSection, setActiveModalSection] = useState(null);
   const [isInboxOpen, setIsInboxOpen] = useState(false);
   const [isAdminDashboardOpen, setIsAdminDashboardOpen] = useState(false);
@@ -393,6 +502,10 @@ export default function App() {
         onOpenAdminDashboard={() => setIsAdminDashboardOpen(true)}
         onOpenAboutPage={() => {
           setActiveWebsite('about');
+          window.scrollTo(0, 0);
+        }}
+        onSelectGoldWebsite={() => {
+          setActiveWebsite('gold');
           window.scrollTo(0, 0);
         }}
       />

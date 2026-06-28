@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Phone, Menu, X, Building2, ShieldCheck } from 'lucide-react';
 
-export default function Navbar({ onOpenInquiries, inquiriesCount, onOpenAdminDashboard, onOpenAboutPage }) {
+export default function Navbar({ onOpenInquiries, inquiriesCount, onOpenAdminDashboard, onOpenAboutPage, onSelectGoldWebsite }) {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
@@ -93,7 +93,7 @@ export default function Navbar({ onOpenInquiries, inquiriesCount, onOpenAdminDas
           </div>
 
           {/* Desktop Navlinks */}
-          <div className="hidden md:flex items-center space-x-6 lg:space-x-8">
+          <div className="hidden md:flex items-center space-x-5 lg:space-x-7">
             {navLinks.map((link) => (
               <button
                 key={link.id}
@@ -120,6 +120,16 @@ export default function Navbar({ onOpenInquiries, inquiriesCount, onOpenAdminDas
                 )}
               </button>
             ))}
+
+            <button
+              onClick={onSelectGoldWebsite}
+              className="relative py-1.5 text-[11px] font-bold tracking-widest text-yellow-500 hover:text-yellow-400 transition-all flex items-center gap-1.5 cursor-pointer uppercase border border-yellow-500/30 bg-yellow-500/5 hover:bg-yellow-500/10 px-2.5 rounded shadow-sm"
+              title="Go straight to the high-converting SGC Gold landing page"
+              id="navbar-desktop-gold-link"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse"></span>
+              SGC Gold Desk
+            </button>
           </div>
 
           {/* Right Controls: Inquiries Inbox & Get In Touch CTA */}
@@ -208,6 +218,19 @@ export default function Navbar({ onOpenInquiries, inquiriesCount, onOpenAdminDas
                   {link.name}
                 </button>
               ))}
+
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  onSelectGoldWebsite();
+                }}
+                className="w-full text-left py-3.5 px-4 text-sm font-bold tracking-widest rounded-lg bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 flex items-center gap-2 cursor-pointer"
+                id="navbar-mobile-gold-link"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse"></span>
+                SGC GOLD DESK
+              </button>
+
               <div className="pt-4 border-t border-yellow-500/10 flex flex-col gap-3">
                 <button
                   onClick={() => {

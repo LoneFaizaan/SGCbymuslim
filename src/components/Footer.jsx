@@ -117,8 +117,9 @@ export default function Footer({ onOpenAboutPage }) {
             <li className="flex gap-2.5 items-start">
               <MapPin className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
               <span>
-                Salafiya Group of Companies (SGC),<br className="hidden sm:inline" />
-                Lal Chowk, Srinagar, Jammu &amp; Kashmir, India
+                <strong>Tricity Vaults:</strong> Sector 17 Commercial Area, Chandigarh, 160017
+                <br />
+                <strong>Head Office:</strong> Lal Chowk, Srinagar, J&amp;K, 190001
               </span>
             </li>
             <li className="flex gap-2.5 items-center">

@@ -109,7 +109,13 @@ export default function BusinessSection({ onExploreBusiness }) {
                 <div className="relative aspect-[4/3] overflow-hidden border-b border-yellow-500/5">
                   <img
                     src={biz.image}
-                    alt={biz.name}
+                    alt={
+                      biz.id === 'gold'
+                        ? "SGC Gold Buyers Chandigarh - Settle Pledged Gold Loans & Get Instant Cash for Gold in Chandigarh, Mohali, Panchkula, Zirakpur"
+                        : biz.id === 'catering'
+                        ? "Salafiya Catering Enterprises - Premium Wedding, Corporate & Event Kashmiri Caterers in Chandigarh, Srinagar & Tricity"
+                        : "Salafi Realestate & Land Developers - Commercial Plots, Premium Lands, & Office Spaces in Srinagar & Chandigarh"
+                    }
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                   />

@@ -2,5 +2,17 @@
 User-agent: *
 Allow: /
 
-# Sitemap Location
+# Allow indexing on all sections of the React SPA
+Allow: /SGC%20Gold
+Allow: /Catering
+Allow: /Real%20Estate
+Allow: /About
+
+# Block administrative panel and internal JSON routes
+Disallow: /api/
+Disallow: /admin/
+Disallow: /CompanyAdminDashboard
+
+# Sitemap Locations
 Sitemap: https://www.sgcindia.org/sitemap.xml
+Sitemap: https://sgc-business-hub-917026721988.asia-southeast1.run.app/sitemap.xml
