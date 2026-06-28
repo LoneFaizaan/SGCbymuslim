@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import sgcGold from '../assets/images/sgc_gold_jewelry_1779942518913.png';
 import elderlyLadyGold from '../assets/images/elderly_lady_gold_1779958425132.png';
+import sgcLogo from '../assets/images/sgc_logo_uploaded.png';
 import { GOLD_RATES } from '../data';
 
 export default function GoldWebsite({ onBackToParent, onSubmitInquiry }) {
@@ -392,8 +393,13 @@ export default function GoldWebsite({ onBackToParent, onSubmitInquiry }) {
               <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
               <span>GROUP PORTAL</span>
             </button>
-            <div className="w-8 h-8 rounded-full border border-yellow-500/40 bg-yellow-500/5 flex items-center justify-center hidden xs:flex">
-              <span className="text-yellow-500 text-xs font-bold animate-pulse">✨</span>
+            <div className="relative w-8 h-8 flex items-center justify-center hidden xs:flex shrink-0">
+              <img 
+                src={sgcLogo} 
+                alt="SGC Logo" 
+                referrerPolicy="no-referrer"
+                className="absolute w-10 h-10 max-w-none object-contain" 
+              />
             </div>
             <div>
               <div className="flex items-center gap-1 leading-none">

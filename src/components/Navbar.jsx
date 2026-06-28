@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Phone, Menu, X, Building2, ShieldCheck } from 'lucide-react';
+import sgcLogo from '../assets/images/sgc_logo_uploaded.png';
 
 export default function Navbar({ onOpenInquiries, inquiriesCount, onOpenAdminDashboard, onOpenAboutPage, onSelectGoldWebsite }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -72,16 +73,14 @@ export default function Navbar({ onOpenInquiries, inquiriesCount, onOpenAdminDas
             className="flex items-center gap-3 cursor-pointer group"
             onClick={() => scrollToSection('home')}
           >
-            {/* Elegant SVG/CSS Logo mirroring SGC Crown logo */}
-            <div className="relative w-12 h-12 flex items-center justify-center rounded-full border-2 border-yellow-500/40 bg-gradient-to-tr from-yellow-600/15 to-amber-500/5 group-hover:border-yellow-500 transition-all duration-300">
-              {/* Outer rotating ring on hover */}
-              <div className="absolute inset-px rounded-full border border-dashed border-yellow-500/20 group-hover:rotate-45 transition-transform duration-1000"></div>
-              
-              {/* SGC Letters and Crown */}
-              <div className="flex flex-col items-center justify-center text-center">
-                <span className="text-[9px] text-yellow-500 font-bold tracking-widest leading-none -mt-1 block">👑</span>
-                <span className="font-serif text-sm font-bold text-yellow-500 tracking-wider">SGC</span>
-              </div>
+            {/* Elegant Golden Eagle Shield SGC Logo */}
+            <div className="relative w-12 h-12 flex items-center justify-center shrink-0">
+              <img 
+                src={sgcLogo} 
+                alt="SGC Group Logo" 
+                referrerPolicy="no-referrer"
+                className="absolute w-14 h-14 max-w-none object-contain transition-transform duration-300 group-hover:scale-110" 
+              />
             </div>
 
             <div className="flex flex-col">

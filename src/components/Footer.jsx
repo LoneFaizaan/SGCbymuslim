@@ -1,4 +1,5 @@
 import { Facebook, Instagram, MessageCircle, MapPin, Phone, Mail } from 'lucide-react';
+import sgcLogo from '../assets/images/sgc_logo_uploaded.png';
 
 export default function Footer({ onOpenAboutPage }) {
   const scrollToSection = (id) => {
@@ -28,8 +29,13 @@ export default function Footer({ onOpenAboutPage }) {
             className="flex items-center gap-3 cursor-pointer group"
             onClick={() => scrollToSection('home')}
           >
-            <div className="w-12 h-12 flex items-center justify-center rounded-full border-2 border-yellow-500/40 bg-yellow-500/5">
-              <span className="font-serif text-sm font-bold text-yellow-500 tracking-wider">SGC</span>
+            <div className="relative w-12 h-12 flex items-center justify-center shrink-0">
+              <img 
+                src={sgcLogo} 
+                alt="SGC Group Logo" 
+                referrerPolicy="no-referrer"
+                className="absolute w-14 h-14 max-w-none object-contain transition-transform duration-300 group-hover:scale-110" 
+              />
             </div>
 
             <div className="flex flex-col">
