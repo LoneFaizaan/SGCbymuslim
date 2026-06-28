@@ -1,0 +1,14 @@
+# Salafiya Group of Companies (SGC India)
+
+Salafiya Group of Companies (SGC India) is a multi-disciplinary conglomerate based in India. SGC operates across key business sectors including Gold trading and investment, luxury Catering services, and premium Real Estate development.
+
+## Core Business Divisions
+
+- **SGC Gold**: Gold trading, custom jewelry advisory, and secure gold savings/investment plans.
+- **SGC Catering**: Custom professional catering services for events, weddings, corporate functions, and high-density gatherings.
+- **SGC Real Estate**: Premium residential and commercial property development, land advisory, and real estate investment consulting.
+
+## Main Entry Points
+- **Homepage**: `https://www.sgcindia.org/` (main portal for company overview and quick division access)
+- **About Us**: Information about corporate values, board of directors, leadership, and group milestones.
+- **Contact / Inquiries**: Centralized inquiries desk synchronized with Supabase and Google Sheets for real-time lead coordination.
